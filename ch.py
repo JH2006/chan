@@ -7,6 +7,10 @@ import pandas as pd
 
 import copy
 
+import math
+
+from pymongo import MongoClient
+
 # 全局变量,记录分型队列位置
 # 变量在构造笔函数中引用
 g_fractal_index = 0
@@ -32,115 +36,98 @@ g_pens_stack_index = 0
 # 全局变量,记录二次延迟处理,和g_pens_stack相似
 g_pens_stack_delay = []
 
-# 数据获取以及初始化
-# 次级数据连同本级数据一起处理
-# 函数参数说明处理数据年份,默认值为2000
-def connectxl(year_start, year_end, start, end):
+
+# 获取10Min数据获取
+def read_10Min(year, start, end):
 
     data_1 = []
 
-    #e_1 = pd.read_csv('ccon5094@uni.sydney.edu.au-AUD1h-N112284510.csv')
-    #e_m = pd.read_csv('ccon5094@uni.sydney.edu.au-AUD10m-N112284425.csv')
+    client = MongoClient()
 
-    e_1 = pd.read_csv('ccon5094@uni.sydney.edu.au-AUD10m-N112284425.csv')
-    # e_2 = pd.read_csv('ccon5094@uni.sydney.edu.au-AUD10m-N112284425XXX.csv')
+    db = client.AUD_trading
 
-    count = 0
-    row_2 = 0
+    coll = db.min_10
 
-     # 本级别数据读取的开始/结束时间戳
-    start_date_1 = pd.datetime.now()
-    end_date_1 = pd.datetime.now()
+    if start < 0 or end > coll.count():
 
-    for row_h in range(0, len(e_1)):
+        print('IndexError')
+        client.close()
 
-        date_1 = pd.to_datetime(e_1['Date[G]'][row_h])
+        return
 
-        # 如果遍历的数据年份和参数相同
-        if year_start <= date_1.year < year_end:
+    cursor = coll.find({'Year': year}, skip=start, limit=end-start)
 
-            count += 1
+    for d in cursor:
 
-            # 第一次进入循环体,记录起点
-            if count == 1:
-                start_date_1 = date_1
+        # 构造高级别K线字典
+        d_1 = {'Year': d['Year'],
+               'Month': d['Month'],
+               'Day': d['Day'],
+               'Hour': d['Hour'],
+               'Min': d['Min'],
+               'Open': d['Open'],
+               'High': d['High'],
+               'Low': d['Low'],
+               'Close': d['Close']}
 
-            if start <= count <= end:
+        data_1.append(d_1)
 
-                time_1 = pd.to_datetime(e_1['Time[G]'][row_h])
-                open_h = e_1['Open'][row_h]
-                high_h = e_1['High'][row_h]
-                low_h = e_1['Low'][row_h]
-                close_1 = e_1['Last'][row_h]
-
-                # 构造高级别K线字典
-                d_1 = {'Year': date_1.year,
-                       'Month': date_1.month,
-                       'Day': date_1.day,
-                       'Hour': time_1.hour,
-                       'Min': time_1.minute,
-                       'Open': open_h,
-                       'High': high_h,
-                       'Low': low_h,
-                       'Close': close_1}
-
-                # 初始化子级别数据存储
-                data_2 = []
-                """
-                while row_2 in range(len(e_2)):
-
-                    date_2 = pd.to_datetime(e_2['Date[G]'][row_2])
-                    time_2 = pd.to_datetime(e_2['Time[G]'][row_2])
-                    open_2 = e_2['Open'][row_2]
-                    high_2 = e_2['High'][row_2]
-                    low_2 = e_2['Low'][row_2]
-                    close_2 = e_2['Last'][row_2]
-
-                    d_2 = {'Year': date_2.year,
-                           'Month': date_2.month,
-                           'Day': date_2.day,
-                           'Hour': time_2.hour,
-                           'Min': time_2.minute,
-                           'Open': open_2,
-                           'High': high_2,
-                           'Low': low_2,
-                           'Close': close_2}
-
-                    # TODO 等实际数据到来后可以实现次级别数据的嵌套
-                """
-
-                data_1.append(d_1)
-
-
-                # 记录可能出现的最后一个本级别数据
-                end_date_1 = date_1
-
-        elif date_1.year >= year_end:
-
-            break
-    """
-
-    # 次级别数据和高级别相同的处理逻辑
-    for row_m in range(len(e_m)):
-
-        date_m = pd.to_datetime(e_m['Date[G]'][row_m])
-
-        if start_date_m <= date_m < end_date_m:
-
-            time_m = pd.to_datetime(e_m['Time[G]'][row_m])
-            open_m = e_m['Open'][row_m]
-            high_m = e_m['High'][row_m]
-            low_m = e_m['Low'][row_m]
-            close_m = e_m['Last'][row_m]
-
-            d_m = {'Year': date_m.year, 'Month': date_m.month, 'Day': date_m.day,
-                   'Hour': time_m.hour, 'Min': time_m.minute, 'Open': open_m, 'High': high_m,
-                   'Low': low_m, 'Close': close_m}
-
-            data_2.append(d_m)
-    """
+    client.close()
 
     return data_1
+
+
+def dump_mongoDB():
+
+    client = MongoClient()
+
+    db = client.AUD_trading
+
+    coll = db.min_1
+
+    e_1 = pd.read_csv('ccon5094@uni.sydney.edu.au-AUD1m-N114646626.csv')
+
+    print('len:', len(e_1))
+
+    count = 0
+    i = 1
+
+    for row in range(0, len(e_1)):
+
+        count += 1
+
+        if count > 10000 * i:
+
+            print(count)
+
+            i += 1
+
+        date_1 = pd.to_datetime(e_1['Date[G]'][row])
+
+        time_1 = pd.to_datetime(e_1['Time[G]'][row])
+        open_h = e_1['Open'][row]
+        high_h = e_1['High'][row]
+        low_h = e_1['Low'][row]
+        close_1 = e_1['Last'][row]
+
+        result = coll.insert_one(
+            {
+                'Year': date_1.year,
+                'Month': date_1.month,
+                'Day': date_1.day,
+                'Hour': time_1.hour,
+                'Min': math.floor(time_1.minute/10) * 10,
+                'Min_1':time_1.minute % 10,
+                'Open': open_h,
+                'High': high_h,
+                'Low': low_h,
+                'Close': close_1
+            }
+        )
+
+    print(coll.count({}))
+
+    client.close()
 
 
 # 处理包含函数
@@ -1092,13 +1079,13 @@ def draw_stocks(stocks, ax_1, ax_2):
 
     ax_2.plot(piexl_x, DIF, color='#9999ff')
     ax_2.plot(piexl_x, DEA, color='#ff9999')
-    ax_2.bar(piexl_x, MACD, 0.8)
+    ax_2.bar(piexl_x, MACD, 0.8, color='g')
 
 
 # 测试调用接口
-def test(year_start=2001, year_end=2002, start=2000, end=2800):
+def test(year=2001, start=2000, end=3000):
 
-    stocks = connectxl(year_start, year_end, start, end)
+    stocks = read_10Min(year, start, end)
 
     print('Stocks Before--', len(stocks))
 
@@ -1155,11 +1142,11 @@ def test(year_start=2001, year_end=2002, start=2000, end=2800):
 
     draw_hub(s_dum, hubs, ax_1)
 
-    file_name = 'Year:' + str(year_start) + 'Start:' + str(start) + '--End:' + str(end)
+    file_name = 'Year:' + str(year) + 'Start:' + str(start) + '--End:' + str(end)
 
     plt.savefig(file_name, dpi='figure', format='pdf')
 
-    plt.close()
+    close()
 
     print('File save DONE!')
 
