@@ -48,7 +48,7 @@ def read_10Min(year, start, end):
 
     coll = db.min_10
 
-    if start < 0 or end > coll.count():
+    if start < 0 or end > coll.count() or start > end:
 
         print('IndexError')
         client.close()
@@ -76,7 +76,7 @@ def read_10Min(year, start, end):
 
     return data_1
 
-
+"""
 def dump_mongoDB():
 
     client = MongoClient()
@@ -128,7 +128,7 @@ def dump_mongoDB():
     print(coll.count({}))
 
     client.close()
-
+"""
 
 # 处理包含函数
 # 每生成一次K线调用一次
@@ -810,17 +810,17 @@ def init_MACD(stocks):
 # GG:构成笔中枢的最高点
 # DD:构成比中枢的最低点
 # hub_width:定义至少的构成中枢的笔数量
-def init_hub(pens, hubs, hub_width=3, hub_fit=7):
+def init_hub(pens, hubs, hub_width=5, hub_fit=7):
 
     global g_last_hub_end_pen
     global g_pens_index
 
-    # 还没有存在中枢
+    # 第一个初始中枢
     if g_last_hub_end_pen == 0:
 
         cur_index = 0
 
-        while cur_index < g_pens_index - 2:
+        while cur_index < g_pens_index:
 
             r = isHub(pens, cur_index, hub_width)
 
@@ -833,9 +833,11 @@ def init_hub(pens, hubs, hub_width=3, hub_fit=7):
                      'GG': r[2],
                      'DD': r[3],
                      'Start_Pen': pens[cur_index+1],
-                     'End_Pen': pens[cur_index+hub_width],
-                     'Start_Type': pens[cur_index+1]['Begin_Type'],
-                     'End_Type': pens[cur_index+hub_width]['End_Type']}
+                     'End_Pen': pens[cur_index+hub_width]}
+
+                # 2016-04-04
+                # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
+                h['Extend'] = copy.deepcopy(h['End_Pen'])
 
                 # 在中枢定义形成后,调用发现延伸函数
                 i = isExpandable(pens, h, cur_index+hub_width)
@@ -845,9 +847,8 @@ def init_hub(pens, hubs, hub_width=3, hub_fit=7):
 
                     # 修改终结点
                     h['End_Pen'] = pens[i]
-                    h['End_Type'] = pens[i]['End_Type']
 
-                    h['Level'] = define_1ub_level(cur_index, i, hub_fit)
+                    # h['Level'] = define_1ub_level(cur_index, i, hub_fit)
 
                     cur_index = i + 1
 
@@ -855,12 +856,17 @@ def init_hub(pens, hubs, hub_width=3, hub_fit=7):
 
                 else:
 
-                    h['Level'] = 1
+                    # h['Level'] = 1
 
                     cur_index += hub_width + 1
 
                     g_last_hub_end_pen = cur_index - 1
 
+                # 2016-04-04
+                # 添加关于中枢相对位置的属性
+                # 此属性标示了当前中枢相对于相邻的前一个中枢的高低位置
+                # 由于第一个初始中枢没有相对位置的概念,这里用'--'表示无效值
+                h['Position'] = '--'
                 hubs.append(h)
 
             else:
@@ -886,9 +892,8 @@ def init_hub(pens, hubs, hub_width=3, hub_fit=7):
 
             # 修改最后一个中枢的属性
             hubs[last_hub_index]['End_Pen'] = pens[g_last_hub_end_pen]
-            hubs[last_hub_index]['End_Type'] = pens[g_last_hub_end_pen]['End_Type']
 
-        # 新生成的笔没有归入中枢,则从最后一个中枢笔开始进行遍历看是否在新生成笔后出现了新中枢的可能
+        # 新生成的笔没能归入已知最后一个中枢,则从最后一个中枢笔开始进行遍历看是否在新生成笔后出现了新中枢的可能
         else:
 
             # 从离最后一个中枢最近的不属于任何中枢的笔开始遍历
@@ -907,35 +912,93 @@ def init_hub(pens, hubs, hub_width=3, hub_fit=7):
                          'GG': r[2],
                          'DD': r[3],
                          'Start_Pen': pens[cur_index+1],
-                         'End_Pen': pens[cur_index+hub_width],
-                         'Start_Type': pens[cur_index+1]['Begin_Type'],
-                         'End_Type': pens[cur_index+hub_width]['End_Type']}
+                         'End_Pen': pens[cur_index+hub_width]}
 
-                    # 在中枢定义形成后,调用延伸函数
-                    i = isExpandable(pens, h, cur_index+hub_width)
+                    # 2016-04-04
+                    # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
+                    h['Extend'] = copy.deepcopy(h['End_Pen'])
 
-                    # 存在延伸
-                    if i != cur_index+hub_width:
+                    # 2016-04-04
+                    # 加入中枢位置对比
+                    # 新中枢在向上的方向,则新中枢第一笔应该是向下笔
+                    if h['ZD'] > last_hub['ZG']:
 
-                        # 修改终结点
-                        h['End_Pen'] = pens[i]
-                        h['End_Type'] = pens[i]['End_Type']
+                        # 新生成的中枢第一笔方向不合理,需要重新处理
+                        if h['Start_Pen']['Position'] != 'Down':
 
-                        h['Level'] = define_1ub_level(cur_index, i, hub_fit)
+                            # 往后偏置对一笔,准备重新开始遍历
+                            cur_index += 1
 
-                        cur_index = i + 1
+                            # 清空字典
+                            h = []
 
-                        g_last_hub_end_pen = i
+                        # 新中枢具有合法的第一笔
+                        # 记录新中枢相对于前一个中枢的位置属性
+                        else:
 
+                            h['Position'] = 'Up'
+
+                            # 出现两次同向中枢
+                            if last_hub['Position'] == '--' or last_hub['Position'] == 'Up':
+
+                                # 处理MACD力量判断
+                                MACD_power()
+
+                    # 新中枢在向下的方向,则新中枢第一笔应该是向上笔
+                    elif h['ZG'] < last_hub['ZD']:
+
+                        # 新生成的中枢第一笔方向不合理,需要重新处理
+                        if h['Start_Pen']['Position'] != 'Up':
+
+                            # 往后偏置对一笔,准备重新开始遍历
+                            cur_index += 1
+
+                            # 清空字典
+                            h = []
+
+                        # 新中枢具有合法的第一笔
+                        # 记录新中枢相对于前一个中枢的位置属性
+                        else:
+
+                            h['Position'] = 'Down'
+
+                            # 出现两次同向中枢
+                            if last_hub['Position'] == '--' or last_hub['Position'] == 'Down':
+
+                                MACD_power()
+
+                    # 前后两个中枢存在重叠区域,这种情况对中枢做合并
+                    # 暂时没有实现
                     else:
 
-                        h['Level'] = 1
+                        h = []
 
-                        cur_index += hub_width + 1
+                    # 只有在新中枢是合理中枢的情况下才继续往下做延伸判断
+                    if len(h) != 0:
+                        # 在中枢定义形成后,调用延伸函数
+                        i = isExpandable(pens, h, cur_index+hub_width)
 
-                        g_last_hub_end_pen = cur_index-1
+                        # 存在延伸
+                        if i != cur_index+hub_width:
 
-                    hubs.append(h)
+                            # 修改终结点
+                            h['End_Pen'] = pens[i]
+
+                            # h['Level'] = define_1ub_level(cur_index, i, hub_fit)
+
+                            cur_index = i + 1
+
+                            g_last_hub_end_pen = i
+
+                        else:
+
+                            # h['Level'] = 1
+
+                            cur_index += hub_width + 1
+
+                            g_last_hub_end_pen = cur_index-1
+
+                        hubs.append(h)
 
                 else:
 
@@ -950,11 +1013,14 @@ def isHub(pens, index, width):
     h = []
     l = []
 
-    if g_pens_index - index - 2 > width:
+    if g_pens_index - index -2 > width:
 
         # 偏置位从1开始,其实是避开了第一个K线.理论上第一个K线不属于中枢
         # 注意遍历的范围为width+1而不是width
-        for i in range(1, width + 1):
+
+        # 2016-04-24
+        # 仍然修改为从"0"第一笔开始遍历5笔
+        for i in range(0, width+1):
 
             h.append(pens[i+index]['High'])
             l.append(pens[i+index]['Low'])
@@ -994,7 +1060,8 @@ def isExpandable(pens, hub, end_pen_index):
     # 初始化索引
     i = end_pen_index + 2
 
-    while i <= g_pens_index - 2:
+    # while i <= g_pens_index - 2:
+    while i < g_pens_index:
 
         pen_high = pens[i]['High']
         pen_low = pens[i]['Low']
@@ -1035,11 +1102,15 @@ def isExpandable(pens, hub, end_pen_index):
     return cur_index
 
 
+def MACD_power():
+
+    print()
+
 # 定义中枢级别
 # minor-1: 仅有3笔
 # median-2: 3<&<9笔
 # huge-100: 9<笔
-def define_1ub_level(start_index, end_index, hub_fit):
+def define_hub_level(start_index, end_index, hub_fit):
 
     if 3 < end_index-start_index <= 5:
         return 2
@@ -1087,7 +1158,7 @@ def test(year=2001, start=2000, end=3000):
 
     stocks = read_10Min(year, start, end)
 
-    print('Stocks Before--', len(stocks))
+    print('Stocks --', len(stocks))
 
     global g_pens_index
 
@@ -1144,11 +1215,9 @@ def test(year=2001, start=2000, end=3000):
 
     file_name = 'Year:' + str(year) + 'Start:' + str(start) + '--End:' + str(end)
 
-    plt.savefig(file_name, dpi='figure', format='pdf')
+    # plt.savefig(file_name, dpi='figure', format='pdf')
 
-    close()
-
-    print('File save DONE!')
+    # print('File save DONE!')
 
 
 # 画K线算法.内部采用了双层遍历,算法简单,但性能一般
@@ -1244,22 +1313,22 @@ def draw_hub(stocks, hubs, ax):
 
         # Rectangle x
 
-        start_date = pd.Timestamp(pd.datetime(hubs[i]['Start_Type']['K']['Year'],
-                                              hubs[i]['Start_Type']['K']['Month'],
-                                              hubs[i]['Start_Type']['K']['Day'],
-                                              hubs[i]['Start_Type']['K']['Hour'],
-                                              hubs[i]['Start_Type']['K']['Min'])).strftime('%Y-%m-%d %H:%M:%S')
+        start_date = pd.Timestamp(pd.datetime(hubs[i]['Start_Pen']['Begin_Type']['K']['Year'],
+                                              hubs[i]['Start_Pen']['Begin_Type']['K']['Month'],
+                                              hubs[i]['Start_Pen']['Begin_Type']['K']['Day'],
+                                              hubs[i]['Start_Pen']['Begin_Type']['K']['Hour'],
+                                              hubs[i]['Start_Pen']['Begin_Type']['K']['Min'])).strftime('%Y-%m-%d %H:%M:%S')
         x = date_index[start_date]
 
         # Rectangle y
         y = hubs[i]['ZD']
 
         # Rectangle width
-        end_date = pd.Timestamp(pd.datetime(hubs[i]['End_Type']['K']['Year'],
-                                            hubs[i]['End_Type']['K']['Month'],
-                                            hubs[i]['End_Type']['K']['Day'],
-                                            hubs[i]['End_Type']['K']['Hour'],
-                                            hubs[i]['End_Type']['K']['Min'])).strftime('%Y-%m-%d %H:%M:%S')
+        end_date = pd.Timestamp(pd.datetime(hubs[i]['End_Pen']['End_Type']['K']['Year'],
+                                            hubs[i]['End_Pen']['End_Type']['K']['Month'],
+                                            hubs[i]['End_Pen']['End_Type']['K']['Day'],
+                                            hubs[i]['End_Pen']['End_Type']['K']['Hour'],
+                                            hubs[i]['End_Pen']['End_Type']['K']['Min'])).strftime('%Y-%m-%d %H:%M:%S')
 
         w = date_index[end_date] - date_index[start_date]
 
@@ -1269,11 +1338,12 @@ def draw_hub(stocks, hubs, ax):
         # Rectangle height
         h = hubs[i]['ZG'] - hubs[i]['ZD']
 
-        if hubs[i]['Level'] == 3:
-            ax.add_patch(patches.Rectangle((x,y), w, h, color='r', fill=False))
+        #if hubs[i]['Level'] == 3:
+        #   ax.add_patch(patches.Rectangle((x,y), w, h, color='r', fill=False))
 
-        else:
-            ax.add_patch(patches.Rectangle((x,y), w, h, color='y', fill=False))
+        #else:
+
+        ax.add_patch(patches.Rectangle((x,y), w, h, color='y', fill=False))
 
 
 # 画MACD
