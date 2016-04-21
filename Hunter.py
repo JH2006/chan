@@ -11,8 +11,6 @@ import copy
 
 import math
 
-import imp
-
 from pymongo import MongoClient
 
 
@@ -134,6 +132,10 @@ class Candle_Container:
 
         self.container = []
 
+    def reset(self):
+
+        self.container = []
+
     def contains(self):
 
         if self.size() == 2:
@@ -203,17 +205,23 @@ class Candle_Container:
                     high = max(self.container[i].getHigh(), self.container[i-1].getHigh())
                     low = max(self.container[i].getLow(), self.container[i-1].getLow())
 
+                    # 修改当前一个K线的属性
+                    self.container[i].setHigh(high)
+                    self.container[i].setLow(low)
+                    self.container[i].setPos('Up')
+
+                    self.container.pop(i-1)
+
                 elif pos == 'Down':
                     high = min(self.container[i].getHigh(), self.container[i-1].getHigh())
                     low = min(self.container[i].getLow(), self.container[i-1].getLow())
 
-                # 修改当前一个K线的属性
-                self.container[i].setHigh(high)
-                self.container[i].setLow(low)
-                self.container[i].setPos('Up')
+                    # 修改当前一个K线的属性
+                    self.container[i].setHigh(high)
+                    self.container[i].setLow(low)
+                    self.container[i].setPos('Down')
 
-                # 删除被包含了的K线
-                self.container.pop(i-1)
+                    self.container.pop(i-1)
 
     def size(self):
 
@@ -237,7 +245,16 @@ class Hour_Candle_Container(Candle_Container):
 
         Candle_Container.__init__(self)
 
-    def loadDB(self, year, month, count, types, pens):
+    def loadBucket(self, hour_bucket):
+
+        self.__bucket = hour_bucket
+
+    # 2016-04-12
+    # 由于目前采用的是数据库历史数据加载,使用的是函数内循环调用.在真实的情况应该是出现一次K线调用一次
+    # TODO: 对于次级别数据处理的最简单方式就是在如同调用types,pens,hubs处理一样,一旦出现了新的本级别K线,就去判断某些如同标志位之类的东西
+    # 如果标志位有效,则加载次级别数据,并同时处理类似本级别这样的type,pens,hubs结构变化的信息
+    # 该如何改变标志位取决于中枢的走势以及本级别笔与中枢的变化关系
+    def loadDB(self, year, month, count, types, pens, hubs):
 
         if count > Hour_Candle_Container.collector.count():
 
@@ -261,26 +278,38 @@ class Hour_Candle_Container(Candle_Container):
                      d['Hour'],
                      d['Open'],
                      d['Close'],
-                     d['High'],
-                    d['Low'])
-
-            # h.mins = Ten_Min_Condle_Container(h.getYear(), h.getMonth(), h.getDay(), h.getHour())
+                     d['High'], d['Low'])
 
             self.container.append(h)
 
             # 在进行容器初始化加载历史数据的时候,同时对这部分数据进行包含处理
             self.contains()
 
+            # 2016-04-19
+            # 一旦Bucket确认激活,最好地跟踪次级别的方式是一旦K线形成并处理完包含,马上进行次级别数据读取
+            # 因为如果等待笔形成后再读取,由于笔的可变性,很容易出现漏读的情况
+            self.dumpBucket()
+
             types.insertType(h)
 
             pens.insertPen()
+
+            hubs.insertHub()
+
+    def dumpBucket(self):
+
+        if self.__bucket.isActive():
+
+            i = len(self.container) - 1
+
+            self.__bucket.loadCandleID(i)
 
     def __del__(self):
 
         Candle_Container.__del__(self)
 
 
-class Ten_Min_Condle_Container(Candle_Container):
+class Ten_Min_Candle_Container(Candle_Container):
 
     collector = Candle_Container.c.mongodb.min_10
 
@@ -288,45 +317,62 @@ class Ten_Min_Condle_Container(Candle_Container):
 
         Candle_Container.__init__(self)
 
-    def loadDB(self, year, month, count, types, pens):
+    def loadDB(self, year, month, count, types, pens, hubs):
+
+        if count > Ten_Min_Candle_Container.collector.count():
+
+            print('Warm!!! Count is overside!!!')
+
+            Ten_Min_Candle_Container.c.closeDB()
 
         try:
 
-            self.cursor = Ten_Min_Condle_Container.collector.find({'Year': year, 'Month': month}, limit=count)
+            self.cursor = Ten_Min_Candle_Container.collector.find({'Year': year, 'Month': month}, limit=count)
 
         except BaseException:
 
-            print('mongoDB goes wrong in Ten_Min_Condle_Container')
+            print('mongoDB goes wrong in Ten_Min_Candle_Container')
 
         for d in self.cursor:
 
-            m = Ten_Min_Candle(d['Year'],
-                        d['Month'],
-                        d['Day'],
-                        d['Hour'],
-                        d['Min'],
-                        d['Open'],
-                        d['Close'],
-                        d['High'],
-                        d['Low'])
-
-            # m.one_min = One_Min_Condle_Container(m.getYear(), m.getMonth(), m.getDay(), m.getHour(), m.getMins())
+            m = Ten_Min_Candle(d['Year'],d['Month'],d['Day'],d['Hour'],d['Min'],d['Open'],d['Close'],d['High'], d['Low'])
 
             self.container.append(m)
 
             # 在进行容器初始化加载历史数据的时候,同时对这部分数据进行包含处理
             self.contains()
 
+            # 2016-04-19
+            # 一旦Bucket确认激活,最好地跟踪次级别的方式是一旦K线形成并处理完包含,马上进行次级别数据读取
+            # 因为如果等待笔形成后再读取,由于笔的可变性,很容易出现漏读的情况
+            self.dumpBucket()
+
             types.insertType(m)
 
             pens.insertPen()
+            """
+
+            hubs.insertHub()
+            """
+
+    def dumpBucket(self):
+
+        if self.__bucket.isActive():
+
+            i = len(self.container) - 1
+
+            self.__bucket.loadCandleID(i)
 
     def __del__(self):
 
         Candle_Container.__del__(self)
 
+    def loadBucket(self, bucket):
 
-class One_Min_Condle_Container(Candle_Container):
+        self.__bucket = bucket
+
+
+class One_Min_Candle_Container(Candle_Container):
 
     collector = Candle_Container.c.mongodb.min_1
 
@@ -334,11 +380,15 @@ class One_Min_Condle_Container(Candle_Container):
 
         Candle_Container.__init__(self)
 
-    def loadDB(self, year, month, day, hour, min, types, pens):
+    def loadDB(self, year, month, day, hour, min, types, pens, hubs):
 
         try:
 
-            self.cursor = One_Min_Condle_Container.collector.find({'Year': year, 'Month': month, 'Day': day, 'Hour': hour, 'Min': min})
+            self.cursor = One_Min_Candle_Container.collector.find({'Year': year,
+                                                                   'Month': month,
+                                                                   'Day': day,
+                                                                   'Hour': hour,
+                                                                   'Min': min}, limit=10)
 
         except BaseException:
 
@@ -359,12 +409,16 @@ class One_Min_Condle_Container(Candle_Container):
 
             self.container.append(m)
 
+            print('One_Min_Candle_Container代码调用--loadDB:', d['Year'],d['Month'],d['Day'],d['Hour'],d['Min'],d['Min_1'])
+
             # 在进行容器初始化加载历史数据的时候,同时对这部分数据进行包含处理
             self.contains()
 
             types.insertType(m)
 
             pens.insertPen()
+
+            hubs.insertHub()
 
     def __del__(self):
 
@@ -412,6 +466,10 @@ class Type_Container:
         self.container = []
 
         self.candle_container = candle_container
+
+    def reset(self):
+
+        self.container = []
 
     # 处理逻辑是当出现一个新的K线的时候,函数对最后的三个K线位置做判断.注意不是最后一个K线
     def insertType(self, candle):
@@ -493,7 +551,6 @@ class Type_Container:
 
         self.container.pop()
 
-
 class Pen():
 
     def __init__(self, high, low, beginType, endType, pos):
@@ -511,11 +568,11 @@ class Pen_Container():
 
         self.container = []
 
-        # 引用实例变量纪录最后访问分型队列的最后位置
-        self.pen_index = 0
+        # 引用实例变量记录最后访问分型队列的最后位置
+        self.types_index = 0
 
         # 指针指向分型结构容器
-        self.types = types
+        self.__types = types
         
         # 记录有效笔的总数量,用于构造中枢过程
         # 有效笔的意思是经过了笔合并处理
@@ -534,15 +591,35 @@ class Pen_Container():
         # 记录临时笔,可用于回退
         self.pens_stack = []
 
+    def reset(self):
+
+        self.container = []
+        self.types_index = 0
+        self.pens_stack_index = 0
+        self.pens_stack = []
+        self.pens_stack_delay = []
+        self.pens_index = 1
+
+
+    def __del__(self):
+
+        self.container = []
+        self.types_index = 0
+        self.pens_stack_index = 0
+        self.pens_stack = []
+        self.pens_stack_delay = []
+        self.pens_index = 1
+
+
     def insertPen(self):
 
         # 遍历分型结构发现笔结构
         # 最后一个分型结构不存在构成笔的可能,省去最后一个分型结构的遍历
 
         # TODO 2016-03-29. 对全局分型做处理未能处理到最后一笔的实现也会导致当前的迟滞
-        while self.pen_index < self.types.size() - 1:
+        while self.types_index < self.__types.size() - 1:
 
-            curType = self.types.container[self.pen_index]
+            curType = self.__types.container[self.types_index]
 
             if curType.getPos() == 'Up':
 
@@ -554,9 +631,9 @@ class Pen_Container():
 
                     # 构造笔字典结构
                     pen = Pen(curType.candle.getHigh(),
-                              self.types.container[self.pen_index].candle.getLow(),
+                              self.__types.container[self.types_index].candle.getLow(),
                               curType,
-                              self.types.container[self.pen_index],
+                              self.__types.container[self.types_index],
                               'Down')
 
                     self.container.append(pen)
@@ -570,10 +647,10 @@ class Pen_Container():
 
                 if nextIndex != -1:
 
-                    pen = Pen(self.types.container[self.pen_index].candle.getHigh(),
+                    pen = Pen(self.__types.container[self.types_index].candle.getHigh(),
                               curType.candle.getLow(),
                               curType,
-                              self.types.container[self.pen_index],
+                              self.__types.container[self.types_index],
                               'Up')
 
                     self.container.append(pen)
@@ -586,74 +663,74 @@ class Pen_Container():
 
     def probeUp(self):
 
-        cur_high = self.types.container[self.pen_index].candle.getHigh()
-        cur_low = self.types.container[self.pen_index].candle.getLow()
+        cur_high = self.__types.container[self.types_index].candle.getHigh()
+        cur_low = self.__types.container[self.types_index].candle.getLow()
 
         # 由于存在向前延伸的行为,数组遍历最大仅能到倒数第二个
-        for j in range(self.pen_index, self.types.size() - 1):
+        for j in range(self.types_index, self.__types.size() - 1):
 
             # 当前分型为顶分型
-            if self.types.container[j].getPos() == 'Up':
+            if self.__types.container[j].getPos() == 'Up':
 
                 # 如果当前顶分型的高点高于已记录的出现过的最高顶分型,则更新最高点数据,并保持当前分型所在数组指针
-                if self.types.container[j].candle.getLow() > cur_low and \
-                    self.types.container[j].candle.getHigh() > cur_high:
+                if self.__types.container[j].candle.getLow() > cur_low and \
+                    self.__types.container[j].candle.getHigh() > cur_high:
 
                     # 记录最后满足条件的信息
-                    cur_high = self.types.container[j].candle.getHigh()
-                    self.pen_index = j
+                    cur_high = self.__types.container[j].candle.getHigh()
+                    self.types_index = j
 
                     # 如果当前顶分型的下一个分型为底分型,同时底分型的低点低于当前顶分型的高点,则说明构造潜在向下笔的条件成立
                     # 此时认为构造当前向上笔完成,返回已记录的最高顶分型指针
-                    if self.types.container[j+1].getPos() == 'Down' and \
-                        self.types.container[j+1].candle.getHigh() < self.types.container[j].candle.getHigh() and \
-                        self.types.container[j+1].candle.getLow() < self.types.container[j].candle.getLow():
+                    if self.__types.container[j+1].getPos() == 'Down' and \
+                        self.__types.container[j+1].candle.getHigh() < self.__types.container[j].candle.getHigh() and \
+                        self.__types.container[j+1].candle.getLow() < self.__types.container[j].candle.getLow():
 
-                        return self.pen_index
+                        return self.types_index
 
                     # 或者下一笔虽然为通向笔,但具有反向性质
-                    elif self.types.container[j+1].getPos() == 'Up' and \
-                        self.types.container[j+1].candle.getHigh() < self.types.container[j].candle.getHigh() and \
-                        self.types.container[j+1].candle.getLow() < self.types.container[j].candle.getLow():
+                    elif self.__types.container[j+1].getPos() == 'Up' and \
+                        self.__types.container[j+1].candle.getHigh() < self.__types.container[j].candle.getHigh() and \
+                        self.__types.container[j+1].candle.getLow() < self.__types.container[j].candle.getLow():
 
-                        return self.pen_index
+                        return self.types_index
 
         # 遍历结束,返回结束标示
         return -1
 
     def probeDown(self):
 
-        cur_high = self.types.container[self.pen_index].candle.getHigh()
-        cur_low = self.types.container[self.pen_index].candle.getLow()
+        cur_high = self.__types.container[self.types_index].candle.getHigh()
+        cur_low = self.__types.container[self.types_index].candle.getLow()
 
         # 由于存在向前延伸的行为,数组遍历最大仅能到倒数第二个
-        for j in range(self.pen_index, self.types.size() - 1):
+        for j in range(self.types_index, self.__types.size() - 1):
 
-            if self.types.container[j].getPos() == 'Down':
+            if self.__types.container[j].getPos() == 'Down':
 
                 # 构成向下笔的顶底分型必须同时满足下面条件是为了避开包含关系
-                if self.types.container[j].candle.getLow() < cur_low and \
-                    self.types.container[j].candle.getHigh() < cur_high:
+                if self.__types.container[j].candle.getLow() < cur_low and \
+                    self.__types.container[j].candle.getHigh() < cur_high:
 
                     # 记录最后满足条件的信息
-                    cur_low = self.types.container[j].candle.getLow()
-                    self.pen_index = j
+                    cur_low = self.__types.container[j].candle.getLow()
+                    self.types_index = j
 
                     # 要同时满足以下条件才能构成笔
                     # 下一个分型为反向分型.目前的实现是认为出现反向分型则此笔结束
                     # 构成向上笔的顶底分型必须同时满足条件以避开包含关系
-                    if self.types.container[j+1].getPos() == 'Up' and \
-                        self.types.container[j+1].candle.getHigh() > self.types.container[j].candle.getHigh() and \
-                        self.types.container[j+1].candle.getLow() > self.types.container[j].candle.getLow():
+                    if self.__types.container[j+1].getPos() == 'Up' and \
+                        self.__types.container[j+1].candle.getHigh() > self.__types.container[j].candle.getHigh() and \
+                        self.__types.container[j+1].candle.getLow() > self.__types.container[j].candle.getLow():
 
-                        return self.pen_index
+                        return self.types_index
 
                     # 或者下一笔虽然为同向笔,但具有反向性质
-                    elif self.types.container[j+1].getPos() == 'Down' and \
-                        self.types.container[j+1].candle.getHigh() > self.types.container[j].candle.getHigh() and \
-                        self.types.container[j+1].candle.getLow() > self.types.container[j].candle.getLow():
+                    elif self.__types.container[j+1].getPos() == 'Down' and \
+                        self.__types.container[j+1].candle.getHigh() > self.__types.container[j].candle.getHigh() and \
+                        self.__types.container[j+1].candle.getLow() > self.__types.container[j].candle.getLow():
 
-                        return self.pen_index
+                        return self.types_index
 
         # 遍历结束,返回结束标示
         return -1
@@ -777,15 +854,16 @@ class Pen_Container():
                         if self.size() - self.pens_index > 2:
 
                             self.container[self.pens_index+2].high = pre_pen.high
-                            self.container[self.pens_index+2].beginType = pre_pen.beginType
+                            self.container[self.pens_index+2].beginType = pre_pen.endType
 
                             # 不合法笔以及与其相连的后一向上笔被销毁
                             self.container.pop(self.pens_index+1)
                             self.container.pop(self.pens_index)
 
                         # 如果此场景不满足了, 就暂时不做处理, 如果后面还有一笔的话也有可能可以处理笔合并
+
                         else:
-                            self.pens_index += 1
+                            # self.pens_index += 1
                             break
 
                 # 处理向上的不合法笔,逻辑与向下笔处理一致
@@ -849,7 +927,7 @@ class Pen_Container():
                             self.container.pop(self.pens_index)
 
                         else:
-                            self.pens_index += 1
+                            # self.pens_index += 1
                             break
 
             else:
@@ -987,26 +1065,1476 @@ class Pen_Container():
 
         return len(self.container)
 
+class Hub:
 
+    def __init__(self, ZG, ZD, GG, DD, s_pen, e_pen):
+
+        self.ZG = ZG
+        self.ZD = ZD
+        self.GG = GG
+        self.DD = DD
+        self.s_pen = s_pen
+        self.e_pen = e_pen
+
+
+class Hub_Container:
+
+    def __init__(self, pens):
+
+        self.pens = pens
+
+        self.container = []
+
+        self.hub_width = 3
+
+        self.last_hub_end_pen_index = 0
+
+    def reset(self):
+
+        self.container = []
+
+        self.last_hub_end_pen_index = 0
+
+    # 2016-04-15
+    # 分解到子类实现
+    """
+    def insertHub(self):
+
+        if self.last_hub_end_pen_index == 0:
+
+            # 当前已经遍历到的笔的索引位置
+            cur_pen_index = 0
+
+            # 2016-04-11
+            # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
+            while cur_pen_index < self.pens.pens_index:
+
+                r = self.isHub(cur_pen_index)
+
+                if isinstance(r, tuple):
+
+                    # 中枢构造的过程具有严格的顺序要求, 特别是ZG,ZD,GG,DD
+                    # 一个考虑点:是否在中枢里面直接定义日前或者采用pens的引用也可以.但在考虑到直接定义好的日期更方便进行次级别走势索引后,决定保留
+                    hub = Hub(r[0],
+                              r[1],
+                              r[2],
+                              r[3],
+                              self.pens.container[cur_pen_index + 1],
+                              self.pens.container[cur_pen_index + self.hub_width])
+
+                    # 2016-04-04
+                    # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
+                    hub.x_pen = copy.deepcopy(hub.e_pen)
+
+                    # 在中枢定义形成后,调用发现延伸函数
+                    i = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                    # 存在延伸
+                    if i != cur_pen_index + self.hub_width:
+
+                        # 修改终结点
+                        hub.e_pen = self.pens.container[i]
+
+                        cur_pen_index = i + 1
+
+                        self.last_hub_end_pen_index = i
+
+                    else:
+
+                        cur_pen_index += self.hub_width + 1
+
+                        self.last_hub_end_pen_index = cur_pen_index - 1
+
+                    # 2016-04-04
+                    # 添加关于中枢相对位置的属性
+                    # 此属性标示了当前中枢相对于相邻的前一个中枢的高低位置
+                    # 由于第一个初始中枢没有相对位置的概念,这里用'--'表示无效值
+                    hub.pos = '--'
+                    self.container.append(hub)
+
+                # -1 说明暂时没有找到合适的中枢,但同时搜索并没有到边界点
+                elif r == -1:
+                    cur_pen_index += 1
+
+                # 返回 1的时候说明已经到了边界,没有继续遍历的需要
+                else:
+                    break
+
+        # 已经存在中枢,则可能出现两种情况:
+        # 1. 已知的最后一个中枢继续生长
+        # 2. 已知的最后一个中枢无法生长,但新出现的笔可能构成新的中枢
+        else:
+
+            # 尝试扩张最后一个中枢,调用延伸函数
+            last_hub_index = self.size() - 1
+            last_hub = self.container[last_hub_index]
+
+            i = self.isExpandable(last_hub, self.last_hub_end_pen_index)
+            
+            # 新生成的笔可以成功归入已有中枢
+
+            # 2016-04-11
+            # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
+            # 被断定为中枢扩展的次级别数据可以存储到本中枢中为次级别走势判断服务
+            # TODO 每次中枢被成功扩展的之后都应该是对次级别走势进行判断的时机
+            if i != self.last_hub_end_pen_index:
+                
+                # 修改最后形成中枢的笔索引
+                self.last_hub_end_pen_index = i 
+                
+                # 修改最后一个中枢的属性
+                self.container[last_hub_index].e_pen = self.pens.container[self.last_hub_end_pen_index]
+
+            # 新生成的笔没能归入已知最后一个中枢,则从最后一个中枢笔开始进行遍历看是否在新生成笔后出现了新中枢的可能
+            else:
+
+                # 从离最后一个中枢最近的不属于任何中枢的笔开始遍历
+                cur_pen_index = self.last_hub_end_pen_index + 1
+
+                # 临时小变量用于保存中枢扩张的笔索引位置
+                e_hub_pen_index = 0
+
+                # 2016-04-11
+                # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
+                while cur_pen_index + self.hub_width <= self.pens.pens_index - 3:
+
+                    # 重新寻找可能存在的新中枢
+                    r = self.isHub(cur_pen_index)
+
+                    if isinstance(r, tuple):
+
+                        hub = Hub(r[0],
+                                  r[1],
+                                  r[2],
+                                  r[3],
+                                  self.pens.container[cur_pen_index + 1],
+                                  self.pens.container[cur_pen_index + self.hub_width])
+
+                        # 2016-04-04
+                        # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
+                        hub.x_pen = copy.deepcopy(hub.e_pen)
+
+                        # 2016-04-11
+                        # TODO: 任何一次新中枢的形成都是对当前正在追踪的次级别走势的分析的终结
+                        # TODO: 任何一次笔离开中枢后又重新回来并行形成新的笔,次级别走势分析结束
+                        # TODO: 任何一笔没有能离开中枢同时新的笔形成,次级别走势分析结束
+
+                        # 2016-04-04
+                        # 加入中枢位置对比
+                        # 新中枢在向上的方向,则新中枢第一笔应该是向下笔
+                        if hub.ZD > last_hub.ZG:
+
+                            # 新生成的中枢第一笔方向不合理,需要重新处理
+                            if hub.s_pen.pos != 'Down':
+
+                                # 往后偏置对一笔,准备重新开始遍历
+                                # 非法中枢,清空,不放入队列
+                                cur_pen_index += 1
+
+                            # 新中枢具有合法的第一笔
+                            # 记录新中枢相对于前一个中枢的位置属性
+                            else:
+
+                                # 新中枢新的位置属性
+                                hub.pos = 'Up'
+
+                                # 调用扩张检查
+
+                                # 2016-04-11
+                                # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
+                                # 被断定为中枢扩展的次级别数据可以存储到本中枢中为次级别走势判断服务
+                                # TODO 每次中枢被成功扩展的之后都应该是对次级别走势进行判断的时机
+                                e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                                if e_hub_pen_index != cur_pen_index + self.hub_width:
+
+                                    hub.e_pen = self.pens.container[e_hub_pen_index]
+
+                                    cur_pen_index = e_hub_pen_index + 1
+
+                                    self.last_hub_end_pen_index = e_hub_pen_index
+
+                                else:
+
+                                    cur_pen_index += self.hub_width + 1
+
+                                    self.last_hub_end_pen_index = cur_pen_index - 1
+
+                                self.container.append(hub)
+
+                                # 出现两次同向中枢
+
+                                # 2016-04-11
+                                # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
+                                # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
+                                # TODO: 当同时需要考虑什么时候退出次级别加载
+                                if last_hub.pos == '--' or last_hub.pos == 'Up':
+
+                                    # 处理MACD力量判断
+                                    # 同时也是检查买卖点的时机
+                                    MACD_power()
+
+                        # 新中枢在向下的方向,则新中枢第一笔应该是向上笔
+                        elif hub.ZG < last_hub.ZD:
+
+                            # 新生成的中枢第一笔方向不合理,需要重新处理
+                            if hub.s_pen.pos != 'Up':
+
+                                cur_pen_index += 1
+
+                            else:
+
+                                # 新中枢新的位置属性
+                                hub.pos = 'Down'
+
+                                # 调用扩张检查
+                                e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                                if e_hub_pen_index != cur_pen_index + self.hub_width:
+
+                                    hub.e_pen = self.pens.container[e_hub_pen_index]
+
+                                    cur_pen_index = e_hub_pen_index + 1
+
+                                    self.last_hub_end_pen_index = e_hub_pen_index
+
+                                else:
+
+                                    cur_pen_index += self.hub_width + 1
+
+                                    self.last_hub_end_pen_index = cur_pen_index - 1
+
+                                self.container.append(hub)
+
+                                # 2016-04-11
+                                # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
+                                # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
+                                # TODO: 当同时需要考虑什么时候退出次级别加载
+                                if last_hub.pos == '--' or \
+                                    last_hub.pos == 'Down':
+
+                                    # 处理MACD力量判断
+                                    # 同时也是检查买卖点的时机
+                                    MACD_power()
+
+                        # TODO: 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
+                        # 前后两个中枢存在重叠区域,这种情况对中枢做合并
+                        # 暂时没有实现,仅仅忽略中枢添加入队列,并且挪到笔
+                        else:
+
+                            cur_pen_index += 1
+
+                    # -1 说明暂时没有找到合适的中枢,但同时搜索并没有到边界点
+                    elif r == -1:
+                        cur_pen_index += 1
+
+                    # 返回 1的时候说明已经到了边界,没有继续遍历的需要
+                    else:
+                        break
+    """
+
+    def size(self):
+
+        return len(self.container)
+
+
+    def isHub(self, index):
+
+        h = []
+        l = []
+
+        # 2016-04-11
+        # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
+        if self.pens.pens_index - index - 3 >= self.hub_width:
+
+            # 偏置位从1开始,其实是避开了第一个K线.理论上第一个K线不属于中枢
+            # 注意遍历的范围为width+1而不是width
+
+            # 2016-04-24
+            # 仍然修改为从"0"第一笔开始遍历5笔
+
+            # 2016-04-09
+            # 包括第一个K线在内的情况下,第五笔就可确认中枢形成
+            # 所以self.width改为3
+            for i in range(0, self.hub_width + 1):
+
+                h.append(self.pens.container[i + index].high)
+                l.append(self.pens.container[i + index].low)
+
+            ZG = min(h)
+            ZD = max(l)
+
+            GG = max(h)
+            DD = min(l)
+
+            if ZG > ZD:
+
+                return ZG, ZD, GG, DD
+
+            else:
+
+                return -1
+
+        else:
+
+            return 1
+
+    # 发现中枢的延伸
+    # end_pen_index是构成中枢至少三笔最后一笔的索引,它等于cur_index+hub_width-1
+    # 基于笔的基本形态,end_pen_index+双数的笔必然和中枢同向,遍历的时候就采用end_pen_index+2*t, t = 1,2,3,4,5.....
+
+    # 2016-04-11
+    # 中枢的扩张部分采用实时跟踪,不需要考虑延迟
+    # 同时中枢的扩张部分不再考虑对中枢区间的修改
+    def isExpandable(self, hub, end_pen_index):
+
+        # 中枢重叠区间
+        hub_ZG = hub.ZG
+        hub_ZD = hub.ZD
+
+        # 保持临时index,最后用于返回,用中枢的最后一笔做为初始化
+        # 结果返回后,如何值为中枢最后一笔,则没有延伸
+        cur_index = end_pen_index
+
+        # 初始化索引
+        i = end_pen_index + 2
+
+        while i < self.pens.pens_index:
+
+            pen_high = self.pens.container[i].high
+            pen_low = self.pens.container[i].low
+
+            min_high = min(hub_ZG, pen_high)
+            max_low = max(hub_ZD, pen_low)
+
+            # 存在交集
+            if min_high > max_low:
+
+                # 保持最后索引位置
+                cur_index = i
+
+                # 刷新中枢重叠区间
+                hub.ZG = min_high
+                hub.ZD = max_low
+
+                hub_ZG = hub.ZG
+                hub_ZD = hub.ZD
+
+                # 2016-04-11
+                # 取消扩张部分对中枢区间的修改
+
+                """
+                # 出现了中枢新高或新低
+                if pen_high > hub.GG:
+
+                    hub.GG = pen_high
+
+                elif pen_low < hub.DD:
+
+                    hub.DD = pen_low
+                """
+
+                # 索引继续往前探寻
+                i += 2
+
+            # 不存在交集,或者探寻结束
+            else:
+
+                break
+
+        return cur_index
+
+class Hour_Hub_Container(Hub_Container):
+
+    def __init__(self, pens, bucket):
+
+        Hub_Container.__init__(self, pens)
+
+        # 对于Bucket和中枢关系的思考:
+        # Bucket本身实际上不属于中枢,但我们可以理解中枢的Containter对象管理了不仅仅是中枢,还应该包括连接了中枢之间的中枢轴
+        # 把Bucket做为Container的一个属性就是让Container同时管理了中枢和中枢轴
+        self.__bucket = bucket
+
+    def insertHub(self):
+
+        if self.last_hub_end_pen_index == 0:
+
+            # 当前已经遍历到的笔的索引位置
+            cur_pen_index = 0
+
+            # 2016-04-11
+            # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
+            while cur_pen_index < self.pens.pens_index:
+
+                r = self.isHub(cur_pen_index)
+
+                if isinstance(r, tuple):
+
+                    # 中枢构造的过程具有严格的顺序要求, 特别是ZG,ZD,GG,DD
+                    # 一个考虑点:是否在中枢里面直接定义日前或者采用pens的引用也可以.但在考虑到直接定义好的日期更方便进行次级别走势索引后,决定保留
+                    hub = Hub(r[0],
+                              r[1],
+                              r[2],
+                              r[3],
+                              self.pens.container[cur_pen_index + 1],
+                              self.pens.container[cur_pen_index + self.hub_width])
+
+                    # 2016-04-04
+                    # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
+                    hub.x_pen = copy.deepcopy(hub.e_pen)
+
+                    # 在中枢定义形成后,调用发现延伸函数
+                    i = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                    # 存在延伸
+                    if i != cur_pen_index + self.hub_width:
+
+                        # 修改终结点
+                        hub.e_pen = self.pens.container[i]
+
+                        cur_pen_index = i + 1
+
+                        self.last_hub_end_pen_index = i
+
+                    else:
+
+                        cur_pen_index += self.hub_width + 1
+
+                        self.last_hub_end_pen_index = cur_pen_index - 1
+
+                    # 2016-04-04
+                    # 添加关于中枢相对位置的属性
+                    # 此属性标示了当前中枢相对于相邻的前一个中枢的高低位置
+                    # 由于第一个初始中枢没有相对位置的概念,这里用'--'表示无效值
+                    hub.pos = '--'
+                    self.container.append(hub)
+
+                # -1 说明暂时没有找到合适的中枢,但同时搜索并没有到边界点
+                elif r == -1:
+                    cur_pen_index += 1
+
+                # 返回 1的时候说明已经到了边界,没有继续遍历的需要
+                else:
+                    break
+
+        # 已经存在中枢,则可能出现两种情况:
+        # 1. 已知的最后一个中枢继续生长
+        # 2. 已知的最后一个中枢无法生长,但新出现的笔可能构成新的中枢
+        else:
+
+            # 尝试扩张最后一个中枢,调用延伸函数
+            last_hub_index = self.size() - 1
+            last_hub = self.container[last_hub_index]
+
+            i = self.isExpandable(last_hub, self.last_hub_end_pen_index)
+
+            # 新生成的笔可以成功归入已有中枢
+            # 2016-04-11
+            # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
+            # 被断定为中枢扩展的次级别数据可以存储到本中枢中为次级别走势判断服务
+            if i != self.last_hub_end_pen_index:
+
+                # 2016-04-18
+                # 中枢延伸的距离有时候会大于1笔,用这个变量记录原始起点
+                t = self.last_hub_end_pen_index
+
+                # 修改最后形成中枢的笔索引
+                self.last_hub_end_pen_index = i
+
+                # 修改最后一个中枢的属性
+                self.container[last_hub_index].e_pen = self.pens.container[self.last_hub_end_pen_index]
+
+                # 2016-04-19
+                # 一旦Bucket确认激活,则转由Candle Container来完成后续的K线次级别读取
+
+                """
+                # TODO 2016-04-17: 如果Bucket处于激活状态,此笔将被放入Bucket,虽然此笔的次级别不具有形成新趋势的可能,但从易于管理的实现角度可以做此处理
+                # 2016-04-17
+
+                if self.__bucket.isActive():
+
+                    print('中枢延伸次级别数据加载笔坐标', t, self.last_hub_end_pen_index)
+
+                    for j in range(t, self.last_hub_end_pen_index + 1):
+
+                        self.__bucket.load(self.pens.container[j])
+                """
+
+            # 新生成的笔没能归入已知最后一个中枢,则从最后一个中枢笔开始进行遍历看是否在新生成笔后出现了新中枢的可能
+            else:
+
+                # 从离最后一个中枢最近的不属于任何中枢的笔开始遍历
+                cur_pen_index = self.last_hub_end_pen_index + 1
+
+                # 临时小变量用于保存中枢扩张的笔索引位置
+                e_hub_pen_index = 0
+
+                # 2016-04-19
+                # 一旦Bucket确认激活,则转由Candle Container来完成后续的K线次级别读取
+                """
+                # 2016-04-18
+                # 在进行新中枢确认之前,首先进行一次笔有效数量的判断,如果确认无法进入中枢判断的区域则对当前笔先做Bucket处理
+                # 直接对最后一笔做Bucket处理
+                if cur_pen_index + self.hub_width > self.pens.pens_index - 3:
+
+                    if self.__bucket.isActive():
+
+                        print('中枢以外笔次级别数据加载笔坐标', cur_pen_index)
+
+                        self.__bucket.load(self.pens.container[len(self.pens.container) - 1])
+                """
+
+                # 2016-04-11
+                # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
+                while cur_pen_index + self.hub_width <= self.pens.pens_index - 3:
+
+                    # 重新寻找可能存在的新中枢
+                    r = self.isHub(cur_pen_index)
+
+                    if isinstance(r, tuple):
+
+                        hub = Hub(r[0],
+                                  r[1],
+                                  r[2],
+                                  r[3],
+                                  self.pens.container[cur_pen_index + 1],
+                                  self.pens.container[cur_pen_index + self.hub_width])
+
+                        # 2016-04-04
+                        # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
+                        hub.x_pen = copy.deepcopy(hub.e_pen)
+
+                        # 2016-04-17
+                        # 新临时变量临时保存cur_pen_index,用于加载Bucket的时候使用
+                        t_cur_pen_index = cur_pen_index
+
+                        # 2016-04-04
+                        # 加入中枢位置对比
+                        # 新中枢在向上的方向,则新中枢第一笔应该是向下笔
+                        if hub.ZD > last_hub.ZG:
+
+                            # 新生成的中枢第一笔方向不合理,需要重新处理
+                            if hub.s_pen.pos != 'Down':
+
+                                # 往后偏置对一笔,准备重新开始遍历
+                                # 非法中枢,清空,不放入队列
+                                cur_pen_index += 1
+
+                            # 新中枢具有合法的第一笔
+                            # 记录新中枢相对于前一个中枢的位置属性
+                            else:
+
+                                # 新中枢新的位置属性
+                                hub.pos = 'Up'
+                                # TODO 2016-04-17: 如果Bucket处于激活状态,请首先去激活并复位
+                                # TODO 2016-04-17: 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
+
+                                # 2016-04-17
+                                # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,都说明了当前处于激活状态的Bucket已经没有意义
+                                if self.__bucket.isActive():
+
+                                    self.__bucket.deactive()
+
+                                # 2016-04-11
+                                # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
+                                # 被断定为中枢扩展的次级别数据可以存储到本中枢中为次级别走势判断服务
+                                e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                                # 具有可扩展性
+                                if e_hub_pen_index != cur_pen_index + self.hub_width:
+
+                                    hub.e_pen = self.pens.container[e_hub_pen_index]
+
+                                    cur_pen_index = e_hub_pen_index + 1
+
+                                    self.last_hub_end_pen_index = e_hub_pen_index
+
+                                # 不具有可扩展新
+                                else:
+
+                                    cur_pen_index += self.hub_width + 1
+
+                                    self.last_hub_end_pen_index = cur_pen_index - 1
+
+                                self.container.append(hub)
+
+                                # 出现两次同向中枢
+
+                                # 2016-04-11
+                                # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
+                                # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
+
+                                # TODO 2016-04-17: 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
+                                if last_hub.pos == 'Up':
+
+                                    # 处理MACD力量判断
+                                    # 同时也是检查买卖点的时机
+                                    MACD_power()
+
+                                    # 2016-04-17
+                                    # 只有在本级别中枢最后确认为趋势形成的时候才激活Bucket
+                                    # Bucket牵扯到多次数据库的读取,控制必要的读取次数也就是优化效率
+                                    self.__bucket.active()
+
+                                    print('中枢生成次级别数据加载笔坐标', self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                          self.pens.container[len(self.pens.container) - 1].endType.candle_index)
+
+                                    for t in range(self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                   self.pens.container[len(self.pens.container) - 1].endType.candle_index):
+
+                                        self.__bucket.loadCandleID(t)
+
+                        # 新中枢在向下的方向,则新中枢第一笔应该是向上笔
+                        elif hub.ZG < last_hub.ZD:
+
+                            # 新生成的中枢第一笔方向不合理,需要重新处理
+                            if hub.s_pen.pos != 'Up':
+
+                                cur_pen_index += 1
+
+                            else:
+
+                                # 新中枢新的位置属性
+                                hub.pos = 'Down'
+
+                                # TODO 2016-04-17: 如果Bucket处于激活状态,请首先去激活并复位
+                                # TODO 2016-04-17: 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
+
+                                # 2016-04-17
+                                # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,都说明了当前处于激活状态的Bucket已经没有意义
+                                if self.__bucket.isActive():
+
+                                    self.__bucket.deactive()
+
+                                # 调用扩张检查
+                                e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                                if e_hub_pen_index != cur_pen_index + self.hub_width:
+
+                                    hub.e_pen = self.pens.container[e_hub_pen_index]
+
+                                    cur_pen_index = e_hub_pen_index + 1
+
+                                    self.last_hub_end_pen_index = e_hub_pen_index
+
+                                else:
+
+                                    cur_pen_index += self.hub_width + 1
+
+                                    self.last_hub_end_pen_index = cur_pen_index - 1
+
+                                self.container.append(hub)
+
+                                # 2016-04-11
+                                # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
+                                # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
+                                if last_hub.pos == 'Down':
+
+                                    # 处理MACD力量判断
+                                    # 同时也是检查买卖点的时机
+                                    MACD_power()
+
+                                    # TODO 2016-04-17: 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
+                                    # 2016-04-17
+                                    # 只有在本级别中枢最后确认为趋势形成的时候才激活Bucket
+                                    # Bucket牵扯到多次数据库的读取,控制必要的读取次数也就是优化效率
+                                    self.__bucket.active()
+
+                                    print('中枢生成次级别数据加载笔坐标', self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                          self.pens.container[len(self.pens.container) - 1].endType.candle_index)
+
+                                    for t in range(self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                   self.pens.container[len(self.pens.container) - 1].endType.candle_index):
+
+                                        self.__bucket.loadCandleID(t)
+
+                        # TODO: 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
+                        # 前后两个中枢存在重叠区域,这种情况对中枢做合并
+                        # 暂时没有实现,仅仅忽略中枢添加入队列,并且挪到笔
+                        else:
+
+                            cur_pen_index += 1
+
+                    # -1 说明暂时没有找到合适的中枢,但同时搜索并没有到边界点
+                    elif r == -1:
+
+                        cur_pen_index += 1
+
+                    # 返回 1的时候说明已经到了边界,没有继续遍历的需要
+                    else:
+                        break
+
+# 2016-04-17
+# 对于中枢采用多态性的原因主要在于重写insertHub接口
+# 不同级别的数据对于形态构成后的处理方式是不一样的
+# 10分钟级别如果是做为最高级别或者中间级别处理,那么当本级别趋势确认的时候会生成Bucket去加载次级别数据,但如果已经是做为最小级别处理,当趋势确认的时候会触发买卖点交易
+class Ten_Min_Hub_Container(Hub_Container):
+
+    def __init__(self, pens, bucket):
+
+        Hub_Container.__init__(self, pens)
+
+        # 对于Bucket和中枢关系的思考:
+        # Bucket本身实际上不属于中枢,但我们可以理解中枢的Containter对象管理了不仅仅是中枢,还应该包括连接了中枢之间的中枢轴
+        # 把Bucket做为Container的一个属性就是让Container同时管理了中枢和中枢轴
+
+        self.__bucket = bucket
+
+    # 2016-04-17
+    # 当前调试阶段暂时把10min级别做为中间级别但不触发此级别加载和买卖点
+    def insertHub(self):
+
+        if self.last_hub_end_pen_index == 0:
+
+            # 当前已经遍历到的笔的索引位置
+            cur_pen_index = 0
+
+            # 2016-04-11
+            # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
+            while cur_pen_index < self.pens.pens_index:
+
+                r = self.isHub(cur_pen_index)
+
+                if isinstance(r, tuple):
+
+                    # 中枢构造的过程具有严格的顺序要求, 特别是ZG,ZD,GG,DD
+                    # 一个考虑点:是否在中枢里面直接定义日前或者采用pens的引用也可以.但在考虑到直接定义好的日期更方便进行次级别走势索引后,决定保留
+                    hub = Hub(r[0],
+                              r[1],
+                              r[2],
+                              r[3],
+                              self.pens.container[cur_pen_index + 1],
+                              self.pens.container[cur_pen_index + self.hub_width])
+
+                    # 2016-04-04
+                    # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
+                    hub.x_pen = copy.deepcopy(hub.e_pen)
+
+                    # 在中枢定义形成后,调用发现延伸函数
+                    i = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                    # 存在延伸
+                    if i != cur_pen_index + self.hub_width:
+
+                        # 修改终结点
+                        hub.e_pen = self.pens.container[i]
+
+                        cur_pen_index = i + 1
+
+                        self.last_hub_end_pen_index = i
+
+                    else:
+
+                        cur_pen_index += self.hub_width + 1
+
+                        self.last_hub_end_pen_index = cur_pen_index - 1
+
+                    # 2016-04-04
+                    # 添加关于中枢相对位置的属性
+                    # 此属性标示了当前中枢相对于相邻的前一个中枢的高低位置
+                    # 由于第一个初始中枢没有相对位置的概念,这里用'--'表示无效值
+                    hub.pos = '--'
+                    self.container.append(hub)
+
+                # -1 说明暂时没有找到合适的中枢,但同时搜索并没有到边界点
+                elif r == -1:
+                    cur_pen_index += 1
+
+                # 返回 1的时候说明已经到了边界,没有继续遍历的需要
+                else:
+                    break
+
+        # 已经存在中枢,则可能出现两种情况:
+        # 1. 已知的最后一个中枢继续生长
+        # 2. 已知的最后一个中枢无法生长,但新出现的笔可能构成新的中枢
+        else:
+
+            # 尝试扩张最后一个中枢,调用延伸函数
+            last_hub_index = self.size() - 1
+            last_hub = self.container[last_hub_index]
+
+            i = self.isExpandable(last_hub, self.last_hub_end_pen_index)
+
+            # 新生成的笔可以成功归入已有中枢
+            # 2016-04-11
+            # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
+            # 被断定为中枢扩展的次级别数据可以存储到本中枢中为次级别走势判断服务
+            if i != self.last_hub_end_pen_index:
+
+                # 2016-04-18
+                # 中枢延伸的距离有时候会大于1笔,用这个变量记录原始起点
+                t = self.last_hub_end_pen_index
+
+                # 修改最后形成中枢的笔索引
+                self.last_hub_end_pen_index = i
+
+                # 修改最后一个中枢的属性
+                self.container[last_hub_index].e_pen = self.pens.container[self.last_hub_end_pen_index]
+
+                # 2016-04-19
+                # 一旦Bucket确认激活,则转由Candle Container来完成后续的K线次级别读取
+
+                """
+                # TODO 2016-04-17: 如果Bucket处于激活状态,此笔将被放入Bucket,虽然此笔的次级别不具有形成新趋势的可能,但从易于管理的实现角度可以做此处理
+                # 2016-04-17
+
+                if self.__bucket.isActive():
+
+                    print('中枢延伸次级别数据加载笔坐标', t, self.last_hub_end_pen_index)
+
+                    for j in range(t, self.last_hub_end_pen_index + 1):
+
+                        self.__bucket.load(self.pens.container[j])
+                """
+
+            # 新生成的笔没能归入已知最后一个中枢,则从最后一个中枢笔开始进行遍历看是否在新生成笔后出现了新中枢的可能
+            else:
+
+                # 从离最后一个中枢最近的不属于任何中枢的笔开始遍历
+                cur_pen_index = self.last_hub_end_pen_index + 1
+
+                # 临时小变量用于保存中枢扩张的笔索引位置
+                e_hub_pen_index = 0
+
+                # 2016-04-19
+                # 一旦Bucket确认激活,则转由Candle Container来完成后续的K线次级别读取
+
+                """
+                # 2016-04-18
+                # 在进行新中枢确认之前,首先进行一次笔有效数量的判断,如果确认无法进入中枢判断的区域则对当前笔先做Bucket处理
+                # 直接对最后一笔做Bucket处理
+                if cur_pen_index + self.hub_width > self.pens.pens_index - 3:
+
+                    if self.__bucket.isActive():
+
+                        print('中枢以外笔次级别数据加载笔坐标', cur_pen_index)
+
+                        self.__bucket.load(self.pens.container[len(self.pens.container) - 1])
+                """
+
+                # 2016-04-11
+                # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
+                while cur_pen_index + self.hub_width <= self.pens.pens_index - 3:
+
+                    # 重新寻找可能存在的新中枢
+                    r = self.isHub(cur_pen_index)
+
+                    if isinstance(r, tuple):
+
+                        hub = Hub(r[0],
+                                  r[1],
+                                  r[2],
+                                  r[3],
+                                  self.pens.container[cur_pen_index + 1],
+                                  self.pens.container[cur_pen_index + self.hub_width])
+
+                        # 2016-04-04
+                        # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
+                        hub.x_pen = copy.deepcopy(hub.e_pen)
+
+                        # 2016-04-17
+                        # 新临时变量临时保存cur_pen_index,用于加载Bucket的时候使用
+                        t_cur_pen_index = cur_pen_index
+
+                        # 2016-04-04
+                        # 加入中枢位置对比
+                        # 新中枢在向上的方向,则新中枢第一笔应该是向下笔
+                        if hub.ZD > last_hub.ZG:
+
+                            # 新生成的中枢第一笔方向不合理,需要重新处理
+                            if hub.s_pen.pos != 'Down':
+
+                                # 往后偏置对一笔,准备重新开始遍历
+                                # 非法中枢,清空,不放入队列
+                                cur_pen_index += 1
+
+                            # 新中枢具有合法的第一笔
+                            # 记录新中枢相对于前一个中枢的位置属性
+                            else:
+
+                                # 新中枢新的位置属性
+                                hub.pos = 'Up'
+                                # TODO 2016-04-17: 如果Bucket处于激活状态,请首先去激活并复位
+                                # TODO 2016-04-17: 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
+
+                                # 2016-04-17
+                                # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,都说明了当前处于激活状态的Bucket已经没有意义
+                                if self.__bucket.isActive():
+
+                                    self.__bucket.deactive()
+
+                                # 2016-04-11
+                                # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
+                                # 被断定为中枢扩展的次级别数据可以存储到本中枢中为次级别走势判断服务
+                                e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                                # 具有可扩展性
+                                if e_hub_pen_index != cur_pen_index + self.hub_width:
+
+                                    hub.e_pen = self.pens.container[e_hub_pen_index]
+
+                                    cur_pen_index = e_hub_pen_index + 1
+
+                                    self.last_hub_end_pen_index = e_hub_pen_index
+
+                                # 不具有可扩展新
+                                else:
+
+                                    cur_pen_index += self.hub_width + 1
+
+                                    self.last_hub_end_pen_index = cur_pen_index - 1
+
+                                self.container.append(hub)
+
+                                # 出现两次同向中枢
+
+                                # 2016-04-11
+                                # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
+                                # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
+
+                                # TODO 2016-04-17: 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
+                                if last_hub.pos == 'Up':
+
+                                    # 处理MACD力量判断
+                                    # 同时也是检查买卖点的时机
+                                    MACD_power()
+
+                                    # 2016-04-17
+                                    # 只有在本级别中枢最后确认为趋势形成的时候才激活Bucket
+                                    # Bucket牵扯到多次数据库的读取,控制必要的读取次数也就是优化效率
+                                    self.__bucket.active()
+
+                                    print('中枢生成次级别数据加载笔坐标', self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                          self.pens.container[len(self.pens.container) - 1].endType.candle_index)
+
+                                    for t in range(self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                   self.pens.container[len(self.pens.container) - 1].endType.candle_index):
+
+                                        self.__bucket.loadCandleID(t)
+
+                        # 新中枢在向下的方向,则新中枢第一笔应该是向上笔
+                        elif hub.ZG < last_hub.ZD:
+
+                            # 新生成的中枢第一笔方向不合理,需要重新处理
+                            if hub.s_pen.pos != 'Up':
+
+                                cur_pen_index += 1
+
+                            else:
+
+                                # 新中枢新的位置属性
+                                hub.pos = 'Down'
+
+                                # TODO 2016-04-17: 如果Bucket处于激活状态,请首先去激活并复位
+                                # TODO 2016-04-17: 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
+
+                                # 2016-04-17
+                                # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,都说明了当前处于激活状态的Bucket已经没有意义
+                                if self.__bucket.isActive():
+
+                                    self.__bucket.deactive()
+
+                                # 调用扩张检查
+                                e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                                if e_hub_pen_index != cur_pen_index + self.hub_width:
+
+                                    hub.e_pen = self.pens.container[e_hub_pen_index]
+
+                                    cur_pen_index = e_hub_pen_index + 1
+
+                                    self.last_hub_end_pen_index = e_hub_pen_index
+
+                                else:
+
+                                    cur_pen_index += self.hub_width + 1
+
+                                    self.last_hub_end_pen_index = cur_pen_index - 1
+
+                                self.container.append(hub)
+
+                                # 2016-04-11
+                                # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
+                                # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
+                                if last_hub.pos == 'Down':
+
+                                    # 处理MACD力量判断
+                                    # 同时也是检查买卖点的时机
+                                    MACD_power()
+
+                                    # TODO 2016-04-17: 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
+                                    # 2016-04-17
+                                    # 只有在本级别中枢最后确认为趋势形成的时候才激活Bucket
+                                    # Bucket牵扯到多次数据库的读取,控制必要的读取次数也就是优化效率
+                                    self.__bucket.active()
+
+                                    print('中枢生成次级别数据加载笔坐标', self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                          self.pens.container[len(self.pens.container) - 1].endType.candle_index)
+
+                                    for t in range(self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                   self.pens.container[len(self.pens.container) - 1].endType.candle_index):
+
+                                        self.__bucket.loadCandleID(t)
+
+                        # TODO: 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
+                        # 前后两个中枢存在重叠区域,这种情况对中枢做合并
+                        # 暂时没有实现,仅仅忽略中枢添加入队列,并且挪到笔
+                        else:
+
+                            cur_pen_index += 1
+
+                    # -1 说明暂时没有找到合适的中枢,但同时搜索并没有到边界点
+                    elif r == -1:
+
+                        cur_pen_index += 1
+
+                    # 返回 1的时候说明已经到了边界,没有继续遍历的需要
+                    else:
+                        break
+
+class One_Min_Hub_Container(Hub_Container):
+
+    def __init__(self, pens):
+
+        Hub_Container.__init__(self, pens)
+
+
+    # 2016-04-17
+    # 当前调试阶段暂时把10min级别做为中间级别但不触发此级别加载和买卖点
+    def insertHub(self):
+
+        if self.last_hub_end_pen_index == 0:
+
+            # 当前已经遍历到的笔的索引位置
+            cur_pen_index = 0
+
+            # 2016-04-11
+            # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
+            while cur_pen_index < self.pens.pens_index:
+
+                r = self.isHub(cur_pen_index)
+
+                if isinstance(r, tuple):
+
+                    # 中枢构造的过程具有严格的顺序要求, 特别是ZG,ZD,GG,DD
+                    # 一个考虑点:是否在中枢里面直接定义日前或者采用pens的引用也可以.但在考虑到直接定义好的日期更方便进行次级别走势索引后,决定保留
+                    hub = Hub(r[0],
+                              r[1],
+                              r[2],
+                              r[3],
+                              self.pens.container[cur_pen_index + 1],
+                              self.pens.container[cur_pen_index + self.hub_width])
+
+                    # 2016-04-04
+                    # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
+                    hub.x_pen = copy.deepcopy(hub.e_pen)
+
+                    # 在中枢定义形成后,调用发现延伸函数
+                    i = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                    # 存在延伸
+                    if i != cur_pen_index + self.hub_width:
+
+                        # 修改终结点
+                        hub.e_pen = self.pens.container[i]
+
+                        cur_pen_index = i + 1
+
+                        self.last_hub_end_pen_index = i
+
+                    else:
+
+                        cur_pen_index += self.hub_width + 1
+
+                        self.last_hub_end_pen_index = cur_pen_index - 1
+
+                    # 2016-04-04
+                    # 添加关于中枢相对位置的属性
+                    # 此属性标示了当前中枢相对于相邻的前一个中枢的高低位置
+                    # 由于第一个初始中枢没有相对位置的概念,这里用'--'表示无效值
+                    hub.pos = '--'
+                    self.container.append(hub)
+
+                # -1 说明暂时没有找到合适的中枢,但同时搜索并没有到边界点
+                elif r == -1:
+                    cur_pen_index += 1
+
+                # 返回 1的时候说明已经到了边界,没有继续遍历的需要
+                else:
+                    break
+
+        # 已经存在中枢,则可能出现两种情况:
+        # 1. 已知的最后一个中枢继续生长
+        # 2. 已知的最后一个中枢无法生长,但新出现的笔可能构成新的中枢
+        else:
+
+            # 尝试扩张最后一个中枢,调用延伸函数
+            last_hub_index = self.size() - 1
+            last_hub = self.container[last_hub_index]
+
+            i = self.isExpandable(last_hub, self.last_hub_end_pen_index)
+
+            # 新生成的笔可以成功归入已有中枢
+            # 2016-04-11
+            # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
+            # 被断定为中枢扩展的次级别数据可以存储到本中枢中为次级别走势判断服务
+            if i != self.last_hub_end_pen_index:
+
+                # 2016-04-18
+                # 中枢延伸的距离有时候会大于1笔,用这个变量记录原始起点
+                t = self.last_hub_end_pen_index
+
+                # 修改最后形成中枢的笔索引
+                self.last_hub_end_pen_index = i
+
+                # 修改最后一个中枢的属性
+                self.container[last_hub_index].e_pen = self.pens.container[self.last_hub_end_pen_index]
+
+            # 新生成的笔没能归入已知最后一个中枢,则从最后一个中枢笔开始进行遍历看是否在新生成笔后出现了新中枢的可能
+            else:
+
+                # 从离最后一个中枢最近的不属于任何中枢的笔开始遍历
+                cur_pen_index = self.last_hub_end_pen_index + 1
+
+                # 临时小变量用于保存中枢扩张的笔索引位置
+                e_hub_pen_index = 0
+
+                # 2016-04-11
+                # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
+                while cur_pen_index + self.hub_width <= self.pens.pens_index - 3:
+
+                    # 重新寻找可能存在的新中枢
+                    r = self.isHub(cur_pen_index)
+
+                    if isinstance(r, tuple):
+
+                        hub = Hub(r[0],
+                                  r[1],
+                                  r[2],
+                                  r[3],
+                                  self.pens.container[cur_pen_index + 1],
+                                  self.pens.container[cur_pen_index + self.hub_width])
+
+                        # 2016-04-04
+                        # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
+                        hub.x_pen = copy.deepcopy(hub.e_pen)
+
+                        # 2016-04-17
+                        # 新临时变量临时保存cur_pen_index,用于加载Bucket的时候使用
+                        t_cur_pen_index = cur_pen_index
+
+                        # 2016-04-04
+                        # 加入中枢位置对比
+                        # 新中枢在向上的方向,则新中枢第一笔应该是向下笔
+                        if hub.ZD > last_hub.ZG:
+
+                            # 新生成的中枢第一笔方向不合理,需要重新处理
+                            if hub.s_pen.pos != 'Down':
+
+                                # 往后偏置对一笔,准备重新开始遍历
+                                # 非法中枢,清空,不放入队列
+                                cur_pen_index += 1
+
+                            # 新中枢具有合法的第一笔
+                            # 记录新中枢相对于前一个中枢的位置属性
+                            else:
+
+                                # 新中枢新的位置属性
+                                hub.pos = 'Up'
+
+                                # 2016-04-11
+                                # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
+                                # 被断定为中枢扩展的次级别数据可以存储到本中枢中为次级别走势判断服务
+                                e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                                # 具有可扩展性
+                                if e_hub_pen_index != cur_pen_index + self.hub_width:
+
+                                    hub.e_pen = self.pens.container[e_hub_pen_index]
+
+                                    cur_pen_index = e_hub_pen_index + 1
+
+                                    self.last_hub_end_pen_index = e_hub_pen_index
+
+                                # 不具有可扩展新
+                                else:
+
+                                    cur_pen_index += self.hub_width + 1
+
+                                    self.last_hub_end_pen_index = cur_pen_index - 1
+
+                                self.container.append(hub)
+
+                                # 出现两次同向中枢
+
+                                # 2016-04-11
+                                # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
+                                # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
+
+                                if last_hub.pos == 'Up':
+
+                                    # 处理MACD力量判断
+                                    # 同时也是检查买卖点的时机
+                                    MACD_power()
+
+                        # 新中枢在向下的方向,则新中枢第一笔应该是向上笔
+                        elif hub.ZG < last_hub.ZD:
+
+                            # 新生成的中枢第一笔方向不合理,需要重新处理
+                            if hub.s_pen.pos != 'Up':
+
+                                cur_pen_index += 1
+
+                            else:
+
+                                # 新中枢新的位置属性
+                                hub.pos = 'Down'
+
+                                # 调用扩张检查
+                                e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                                if e_hub_pen_index != cur_pen_index + self.hub_width:
+
+                                    hub.e_pen = self.pens.container[e_hub_pen_index]
+
+                                    cur_pen_index = e_hub_pen_index + 1
+
+                                    self.last_hub_end_pen_index = e_hub_pen_index
+
+                                else:
+
+                                    cur_pen_index += self.hub_width + 1
+
+                                    self.last_hub_end_pen_index = cur_pen_index - 1
+
+                                self.container.append(hub)
+
+                                # 2016-04-11
+                                # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
+                                # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
+                                if last_hub.pos == 'Down':
+
+                                    # 处理MACD力量判断
+                                    # 同时也是检查买卖点的时机
+                                    MACD_power()
+
+                        # TODO: 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
+                        # 前后两个中枢存在重叠区域,这种情况对中枢做合并
+                        # 暂时没有实现,仅仅忽略中枢添加入队列,并且挪到笔
+                        else:
+
+                            cur_pen_index += 1
+
+                    # -1 说明暂时没有找到合适的中枢,但同时搜索并没有到边界点
+                    elif r == -1:
+
+                        cur_pen_index += 1
+
+                    # 返回 1的时候说明已经到了边界,没有继续遍历的需要
+                    else:
+                        break
+
+def MACD_power():
+
+   print()
+
+
+class Hour_Bucket():
+
+    def __init__(self, candles):
+
+        # 2016-04-16
+        # 状态机
+        self.__state = 0
+
+        # 2016-04-17
+        # 记录最后一个被记录的Candle的位置
+        self.__last_candle = 0
+
+        # 指向本级别的Candles容器指针,本级别的K线需要通过此容器读取
+        self.__candles = candles
+
+        self.candle_container = Ten_Min_Candle_Container()
+
+        # 在K线初始化后,分别生成各个对于的形态对象
+        self.types = Type_Container(self.candle_container)
+
+        self.pens = Pen_Container(self.types)
+
+        self.hubs = Ten_Min_Hub_Container(self.pens)
+
+
+    def isActive(self):
+
+        if self.__state == 0:
+
+            return False
+
+        else:
+
+            return True
+
+    def active(self):
+
+        self.__state = 1
+
+    def __reset(self):
+
+        self.hubs.reset()
+        self.pens.reset()
+        self.types.reset()
+        self.candle_container.reset()
+
+    def deactive(self):
+
+        self.__state = 0
+
+        self.__last_candle = 0
+
+        self.__reset()
+
+    def loadCandle(self, candle):
+
+        print('Bucket代码调用-loadCandle, 高级别K线时间:', candle.getYear(), candle.getMonth(), candle.getDay(), candle.getHour())
+
+        self.candle_container.loadDB(candle.getYear(),
+                                     candle.getMonth(),
+                                     candle.getDay(),
+                                     candle.getHour(),
+                                     self.types,
+                                     self.pens,
+                                     self.hubs)
+
+    # 2016-04-13
+    # 以高级别的笔做为次级别数据的生成条件
+    def loadCandleID(self, t):
+
+        print('Bucket代码调用--load,高级别K线范围ID:', t)
+
+        candle = self.__candles.container[t]
+
+        print('Bucket代码调用--load, 高级别K线时间:', candle.getYear(), candle.getMonth(), candle.getDay(), candle.getHour())
+
+        self.candle_container.loadDB(candle.getYear(),
+                                     candle.getMonth(),
+                                     candle.getDay(),
+                                     candle.getHour(),
+                                     self.types,
+                                     self.pens,
+                                     self.hubs)
+
+
+class Ten_Min_Bucket():
+
+    def __init__(self, candles):
+
+        # 2016-04-16
+        # 状态机
+        self.__state = 0
+
+        # 2016-04-17
+        # 记录最后一个被记录的Candle的位置
+        self.__last_candle = 0
+
+        # 指向本级别的Candles容器指针,本级别的K线需要通过此容器读取
+        self.__candles = candles
+
+        self.candle_container = One_Min_Candle_Container()
+
+        # 在K线初始化后,分别生成各个对于的形态对象
+        self.types = Type_Container(self.candle_container)
+
+        self.pens = Pen_Container(self.types)
+
+        self.hubs = One_Min_Hub_Container(self.pens)
+
+    def isActive(self):
+
+        if self.__state == 0:
+
+            return False
+
+        else:
+
+            return True
+
+    def active(self):
+
+        self.__state = 1
+
+    def __reset(self):
+
+        self.hubs.reset()
+        self.pens.reset()
+        self.types.reset()
+        self.candle_container.reset()
+
+    def deactive(self):
+
+        self.__state = 0
+
+        self.__last_candle = 0
+
+        self.__reset()
+
+        print('Bucket Die!!!!!!!!!!!!')
+
+    # 2016-04-13
+    # 以高级别的笔做为次级别数据的生成条件
+    def loadCandleID(self, t):
+        """
+        print('Bucket代码调用--loadCandleID,高级别K线范围ID:', t)
+
+        candle = self.__candles.container[t]
+
+        print('Bucket代码调用--loadCandleID, 高级别K线时间:', candle.getYear(), candle.getMonth(), candle.getDay(),
+              candle.getHour(), candle.getMins())
+
+        self.candle_container.loadDB(candle.getYear(),
+                                     candle.getMonth(),
+                                     candle.getDay(),
+                                     candle.getHour(),
+                                     candle.getMins(),
+                                     self.types,
+                                     self.pens,
+                                     self.hubs)
+        """
 def test(year, month, count):
 
-    m_container = Hour_Candle_Container()
+    candles = Ten_Min_Candle_Container()
 
-    m_types = Type_Container(m_container)
+    types = Type_Container(candles)
 
-    m_pens = Pen_Container(m_types)
+    pens = Pen_Container(types)
 
-    m_container.loadDB(year, month, count, m_types, m_pens)
+    b = Ten_Min_Bucket(candles)
+
+    candles.loadBucket(b)
+
+    hubs = Ten_Min_Hub_Container(pens, b)
+
+    candles.loadDB(year, month, count, types, pens, hubs)
+
+    print(hubs.size())
 
     ax_1 = plt.subplot(211)
 
     ax_2 = plt.subplot(212)
 
-    draw_stocks(m_container.container, m_types.container, ax_1, ax_2)
+    draw_stocks(candles.container, types.container, ax_1, ax_2)
 
-    draw_pens(m_container.container, m_pens.container, ax_1)
+    draw_pens(candles.container, pens.container, ax_1)
+
+    draw_hub(candles.container, hubs.container, ax_1)
+
+    draw_stocks(b.candle_container.container, b.types.container, ax_2, ax_1)
+
+    draw_pens(b.candle_container.container, b.pens.container, ax_2)
+
+    draw_hub(b.candle_container.container, b.hubs.container, ax_2)
 
     Candle_Container.closeDB()
+
 
 # 画K线算法.内部采用了双层遍历,算法简单,但性能一般
 def draw_stocks(stocks, types, ax_1, ax_2):
@@ -1046,11 +2574,13 @@ def draw_stocks(stocks, types, ax_1, ax_2):
             if pd.Timestamp(pd.datetime(stocks[i].getYear(),
                                         stocks[i].getMonth(),
                                         stocks[i].getDay(),
-                                        stocks[i].getHour())) == \
+                                        stocks[i].getHour(),
+                                        stocks[i].getMins())) == \
                     pd.datetime(types[j].candle.getYear(),
                                 types[j].candle.getMonth(),
                                 types[j].candle.getDay(),
-                                types[j].candle.getHour()):
+                                types[j].candle.getHour(),
+                                types[j].candle.getMins()):
 
                 c[i] = 'r'
                 break
@@ -1071,7 +2601,8 @@ def draw_pens(stocks, pens, ax):
     date_index = {pd.Timestamp(pd.datetime(stocks[i].getYear(),
                                            stocks[i].getMonth(),
                                            stocks[i].getDay(),
-                                           stocks[i].getHour())).strftime('%Y-%m-%d %H:%M:%S'): i for i in range(len(stocks))}
+                                           stocks[i].getHour(),
+                                           stocks[i].getMins())).strftime('%Y-%m-%d %H:%M:%S'): i for i in range(len(stocks))}
 
     piexl_x = []
     piexl_y = []
@@ -1083,13 +2614,15 @@ def draw_pens(stocks, pens, ax):
         piexl_x.append(date_index[pd.Timestamp(pd.datetime(pens[j].beginType.candle.getYear(),
                                                            pens[j].beginType.candle.getMonth(),
                                                            pens[j].beginType.candle.getDay(),
-                                                           pens[j].beginType.candle.getHour())).strftime('%Y-%m-%d %H:%M:%S')])
+                                                           pens[j].beginType.candle.getHour(),
+                                                           pens[j].beginType.candle.getMins())).strftime('%Y-%m-%d %H:%M:%S')])
 
         # 添加终点
         piexl_x.append(date_index[pd.Timestamp(pd.datetime(pens[j].endType.candle.getYear(),
                                                            pens[j].endType.candle.getMonth(),
                                                            pens[j].endType.candle.getDay(),
-                                                           pens[j].endType.candle.getHour())).strftime('%Y-%m-%d %H:%M:%S')])
+                                                           pens[j].endType.candle.getHour(),
+                                                           pens[j].endType.candle.getMins())).strftime('%Y-%m-%d %H:%M:%S')])
 
         if pens[j].pos == 'Down':
 
@@ -1105,6 +2638,48 @@ def draw_pens(stocks, pens, ax):
 
     # 画线程序调用
     ax.plot(piexl_x, piexl_y, color='m')
+
+# 画中枢
+def draw_hub(stocks, hubs, ax):
+
+    date_index = {pd.Timestamp(pd.datetime(stocks[i].getYear(),
+                                           stocks[i].getMonth(),
+                                           stocks[i].getDay(),
+                                           stocks[i].getHour())).strftime('%Y-%m-%d %H:%M:%S'): i for i in range(len(stocks))}
+
+    for i in range(len(hubs)):
+
+        # Rectangle x
+
+        start_date = pd.Timestamp(pd.datetime(hubs[i].s_pen.beginType.candle.getYear(),
+                                              hubs[i].s_pen.beginType.candle.getMonth(),
+                                              hubs[i].s_pen.beginType.candle.getDay(),
+                                              hubs[i].s_pen.beginType.candle.getHour())).strftime('%Y-%m-%d %H:%M:%S')
+
+        x = date_index[start_date]
+
+        # Rectangle y
+        y = hubs[i].ZD
+
+        # Rectangle width
+        end_date = pd.Timestamp(pd.datetime(hubs[i].e_pen.endType.candle.getYear(),
+                                            hubs[i].e_pen.endType.candle.getMonth(),
+                                            hubs[i].e_pen.endType.candle.getDay(),
+                                            hubs[i].e_pen.endType.candle.getHour())).strftime('%Y-%m-%d %H:%M:%S')
+
+        w = date_index[end_date] - date_index[start_date]
+
+        # print('Hub--', i ,'B--', start_date, 'E--', end_date, 'W--', w, 'GG--', hubs[i]['GG'], 'DD--', hubs[i]['DD'])
+
+        # Rectangle height
+        h = hubs[i].ZG - hubs[i].ZD
+
+        #if hubs[i]['Level'] == 3:
+        #   ax.add_patch(patches.Rectangle((x,y), w, h, color='r', fill=False))
+
+        #else:
+
+        ax.add_patch(patches.Rectangle((x,y), w, h, color='y', fill=False))
 
 
 def close():
