@@ -347,21 +347,31 @@ class Ten_Min_Candle_Container(Candle_Container):
             # 因为如果等待笔形成后再读取,由于笔的可变性,很容易出现漏读的情况
             self.dumpBucket()
 
+            self.trading(d['Close'])
+
             types.insertType(m)
 
             pens.insertPen()
-            """
 
             hubs.insertHub()
-            """
+
 
     def dumpBucket(self):
 
-        if self.__bucket.isActive():
+        if self.__bucket.isBucketAct():
 
             i = len(self.container) - 1
 
             self.__bucket.loadCandleID(i)
+
+    def trading(self, p):
+
+        self.__bucket.isExecutable(p)
+
+        if trader.isTrading(p):
+
+            self.__bucket.deFroBucket()
+
 
     def __del__(self):
 
@@ -380,7 +390,7 @@ class One_Min_Candle_Container(Candle_Container):
 
         Candle_Container.__init__(self)
 
-    def loadDB(self, year, month, day, hour, min, types, pens, hubs):
+    def loadDB(self, year, month, day, hour, min, types, pens, hubs, bucket):
 
         try:
 
@@ -473,6 +483,33 @@ class Type_Container:
 
     # 处理逻辑是当出现一个新的K线的时候,函数对最后的三个K线位置做判断.注意不是最后一个K线
     def insertType(self, candle):
+
+        # 2016-04-21
+        # 处理最初第一根K线的情况,因为没有左边的K线,所以对第一个K线的判断仅仅依赖右边的即可
+        if self.candle_container.size() == 2:
+
+            pos_candle = self.candle_container.container[1]
+            cur_candle = self.candle_container.container[0]
+
+            # 后探K线
+            pos_high = pos_candle.getHigh()
+            pos_low = pos_candle.getLow()
+
+            # 当前K线
+            cur_high = cur_candle.getHigh()
+            cur_low = cur_candle.getLow()
+
+            if cur_high > pos_high and cur_low > pos_low:
+
+                t = Up_Typer(cur_candle, 0)
+
+            elif cur_high < pos_high and cur_low < pos_low:
+
+                t = Down_Typer(cur_candle, 0)
+
+            self.container.append(t)
+
+            return
 
         # 只有当存在至少三根K线后才做分型处理
         if self.candle_container.size() < 3:
@@ -1874,19 +1911,6 @@ class Ten_Min_Hub_Container(Hub_Container):
                 # 2016-04-19
                 # 一旦Bucket确认激活,则转由Candle Container来完成后续的K线次级别读取
 
-                """
-                # TODO 2016-04-17: 如果Bucket处于激活状态,此笔将被放入Bucket,虽然此笔的次级别不具有形成新趋势的可能,但从易于管理的实现角度可以做此处理
-                # 2016-04-17
-
-                if self.__bucket.isActive():
-
-                    print('中枢延伸次级别数据加载笔坐标', t, self.last_hub_end_pen_index)
-
-                    for j in range(t, self.last_hub_end_pen_index + 1):
-
-                        self.__bucket.load(self.pens.container[j])
-                """
-
             # 新生成的笔没能归入已知最后一个中枢,则从最后一个中枢笔开始进行遍历看是否在新生成笔后出现了新中枢的可能
             else:
 
@@ -1898,19 +1922,6 @@ class Ten_Min_Hub_Container(Hub_Container):
 
                 # 2016-04-19
                 # 一旦Bucket确认激活,则转由Candle Container来完成后续的K线次级别读取
-
-                """
-                # 2016-04-18
-                # 在进行新中枢确认之前,首先进行一次笔有效数量的判断,如果确认无法进入中枢判断的区域则对当前笔先做Bucket处理
-                # 直接对最后一笔做Bucket处理
-                if cur_pen_index + self.hub_width > self.pens.pens_index - 3:
-
-                    if self.__bucket.isActive():
-
-                        print('中枢以外笔次级别数据加载笔坐标', cur_pen_index)
-
-                        self.__bucket.load(self.pens.container[len(self.pens.container) - 1])
-                """
 
                 # 2016-04-11
                 # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
@@ -1959,9 +1970,14 @@ class Ten_Min_Hub_Container(Hub_Container):
 
                                 # 2016-04-17
                                 # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,都说明了当前处于激活状态的Bucket已经没有意义
-                                if self.__bucket.isActive():
+                                if self.__bucket.isBucketAct():
 
-                                    self.__bucket.deactive()
+                                    # 2016-04-23
+                                    # 只有在新的中枢是反向中枢的时候才去激活,延迟了去激活时间
+                                    # 目的: 背驰段可能出现在本级别的盘整中枢延伸的过程中
+                                    if self.__bucket.isSameTrending('Down'):
+
+                                        self.__bucket.deactBucket()
 
                                 # 2016-04-11
                                 # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
@@ -1992,25 +2008,74 @@ class Ten_Min_Hub_Container(Hub_Container):
                                 # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
                                 # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
 
-                                # TODO 2016-04-17: 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
+                                # 2016-04-17: 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
                                 if last_hub.pos == 'Up':
-
-                                    # 处理MACD力量判断
-                                    # 同时也是检查买卖点的时机
-                                    MACD_power()
 
                                     # 2016-04-17
                                     # 只有在本级别中枢最后确认为趋势形成的时候才激活Bucket
                                     # Bucket牵扯到多次数据库的读取,控制必要的读取次数也就是优化效率
-                                    self.__bucket.active()
 
-                                    print('中枢生成次级别数据加载笔坐标', self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
-                                          self.pens.container[len(self.pens.container) - 1].endType.candle_index)
+                                    # 2016-04-24
+                                    # 只有在Bucket非终结状态的时候才能激活
+                                    # 目前的考虑是在处于交易状态的时候不允许更新任何Bucket相关的状态,直到此次交易结束
+                                    # 好处是让同一时间仅有一个交易过程,直到Exit或者Stop出现,整个交易过程易于管理
+                                    # 可能出现的缺点是如果市场一直在Exit和Stop之间的区间不断波动,那么程序就处于不交易状态,当然如何Exit和Stop
+                                    # 的差合理,这样的波动本质上就是中枢的构造过程,不应该操作.
+                                    # 所以Exit和Stop的设定很重要
+                                    # TODO 是否考虑在交易保存激活的时候不再做Bucket更新
+                                    if self.__bucket.isFrozen() != True:
 
-                                    for t in range(self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
-                                                   self.pens.container[len(self.pens.container) - 1].endType.candle_index):
+                                        if self.__bucket.isBucketAct():
 
-                                        self.__bucket.loadCandleID(t)
+                                            # 2016-04-26
+                                            # 相邻的一个中枢没有附着Bucket
+                                            #
+                                            if last_hub.isSticky != True:
+
+                                                self.__bucket.deactBucket()
+
+                                                self.__bucket.activeBucket(hub.ZG)
+
+                                                self.isSticky = True
+
+                                                # 2016-04-23
+                                                # 配置Bucket走势方向属性
+                                                self.__bucket.setTrending('Up')
+
+                                                print('中枢生成次级别数据加载笔坐标',
+                                                      self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                      self.pens.container[len(self.pens.container) - 1].endType.candle_index)
+
+                                                for t in range(self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                               self.pens.container[len(self.pens.container) - 1].endType.candle_index):
+
+                                                    self.__bucket.loadCandleID(t)
+
+                                            # 2016-04-26
+                                            # 如果上一个中枢有附着Bucket,同时本中枢又同向,这种情况又可能是盘整,要避免错杀盘整的情况
+                                            # 不对Bucket做任何处理
+                                            else:
+
+                                                self.isSticky = False
+
+                                        else:
+
+                                            self.__bucket.activeBucket(hub.ZG)
+
+                                            self.isSticky = True
+
+                                            # 2016-04-23
+                                            # 配置Bucket走势方向属性
+                                            self.__bucket.setTrending('Up')
+
+                                            print('中枢生成次级别数据加载笔坐标',
+                                                  self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                  self.pens.container[len(self.pens.container) - 1].endType.candle_index)
+
+                                            for t in range(self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                           self.pens.container[len(self.pens.container) - 1].endType.candle_index):
+
+                                                self.__bucket.loadCandleID(t)
 
                         # 新中枢在向下的方向,则新中枢第一笔应该是向上笔
                         elif hub.ZG < last_hub.ZD:
@@ -2030,9 +2095,14 @@ class Ten_Min_Hub_Container(Hub_Container):
 
                                 # 2016-04-17
                                 # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,都说明了当前处于激活状态的Bucket已经没有意义
-                                if self.__bucket.isActive():
+                                if self.__bucket.isBucketAct():
 
-                                    self.__bucket.deactive()
+                                    # 2016-04-23
+                                    # 只有在新的中枢是反向中枢的时候才去激活,延迟了去激活时间
+                                    # 目的: 背驰段可能出现在本级别的盘整中枢延伸的过程中
+                                    if self.__bucket.isSameTrending('Up'):
+
+                                        self.__bucket.deactBucket()
 
                                 # 调用扩张检查
                                 e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
@@ -2058,23 +2128,64 @@ class Ten_Min_Hub_Container(Hub_Container):
                                 # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
                                 if last_hub.pos == 'Down':
 
-                                    # 处理MACD力量判断
-                                    # 同时也是检查买卖点的时机
-                                    MACD_power()
-
                                     # TODO 2016-04-17: 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
                                     # 2016-04-17
                                     # 只有在本级别中枢最后确认为趋势形成的时候才激活Bucket
                                     # Bucket牵扯到多次数据库的读取,控制必要的读取次数也就是优化效率
-                                    self.__bucket.active()
 
-                                    print('中枢生成次级别数据加载笔坐标', self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
-                                          self.pens.container[len(self.pens.container) - 1].endType.candle_index)
+                                    if self.__bucket.isFrozen() != True:
 
-                                    for t in range(self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
-                                                   self.pens.container[len(self.pens.container) - 1].endType.candle_index):
+                                        if self.__bucket.isBucketAct():
 
-                                        self.__bucket.loadCandleID(t)
+                                            # 2016-04-26
+                                            # 相邻的一个中枢没有附着Bucket
+                                            #
+                                            if last_hub.isSticky != True:
+
+                                                self.__bucket.deactBucket()
+
+                                                self.__bucket.activeBucket(hub.ZD)
+
+                                                self.isSticky = True
+
+                                                # 2016-04-23
+                                                # 配置Bucket走势方向属性
+                                                self.__bucket.setTrending('Down')
+
+                                                print('中枢生成次级别数据加载笔坐标',
+                                                      self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                      self.pens.container[len(self.pens.container) - 1].endType.candle_index)
+
+                                                for t in range(self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                               self.pens.container[len(self.pens.container) - 1].endType.candle_index):
+
+                                                    self.__bucket.loadCandleID(t)
+
+                                            # 2016-04-26
+                                            # 如果上一个中枢有附着Bucket,同时本中枢又同向,这种情况又可能是盘整,要避免错杀盘整的情况
+                                            # 不对Bucket做任何处理
+                                            else:
+
+                                                self.isSticky = False
+
+                                        else:
+
+                                            self.__bucket.activeBucket(hub.ZD)
+
+                                            self.isSticky = True
+
+                                            # 2016-04-23
+                                            # 配置Bucket走势方向属性
+                                            self.__bucket.setTrending('Up')
+
+                                            print('中枢生成次级别数据加载笔坐标',
+                                                  self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                  self.pens.container[len(self.pens.container) - 1].endType.candle_index)
+
+                                            for t in range(self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
+                                                           self.pens.container[len(self.pens.container) - 1].endType.candle_index):
+
+                                                self.__bucket.loadCandleID(t)
 
                         # TODO: 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
                         # 前后两个中枢存在重叠区域,这种情况对中枢做合并
@@ -2094,10 +2205,11 @@ class Ten_Min_Hub_Container(Hub_Container):
 
 class One_Min_Hub_Container(Hub_Container):
 
-    def __init__(self, pens):
+    def __init__(self, pens, bucket):
 
         Hub_Container.__init__(self, pens)
 
+        self.__bucket = bucket
 
     # 2016-04-17
     # 当前调试阶段暂时把10min级别做为中间级别但不触发此级别加载和买卖点
@@ -2242,6 +2354,14 @@ class One_Min_Hub_Container(Hub_Container):
                                 # 新中枢新的位置属性
                                 hub.pos = 'Up'
 
+                                # 2016-04-24
+                                # 如果买卖点已经激活,但却出现了一个反向的中枢,这是去激活买卖点
+                                if self.__bucket.isBucketAct() and self.__bucket.isEntryAct():
+
+                                    if self.__bucket.isSameTrending('Down'):
+
+                                        self.__bucket.deactEntry()
+
                                 # 2016-04-11
                                 # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
                                 # 被断定为中枢扩展的次级别数据可以存储到本中枢中为次级别走势判断服务
@@ -2273,9 +2393,19 @@ class One_Min_Hub_Container(Hub_Container):
 
                                 if last_hub.pos == 'Up':
 
-                                    # 处理MACD力量判断
-                                    # 同时也是检查买卖点的时机
-                                    MACD_power()
+                                    if self.__bucket.isBucketAct() and self.__bucket.isSameTrending('Up'):
+
+                                        if self.__bucket.isEntryAct():
+
+                                        else:
+
+                                            # 2016-04-23
+                                            # 如果次级别走势形成,触发Bucket买卖点状态,同时传递次级别中枢最低
+                                            #TODO 目前的实现没有中枢个数的限制,只要是两个以上的同向中枢都会持续激活买卖点和门限
+                                            self.__bucket.activeEntry(hub.ZG)
+
+                                        MACD_power()
+
 
                         # 新中枢在向下的方向,则新中枢第一笔应该是向上笔
                         elif hub.ZG < last_hub.ZD:
@@ -2289,6 +2419,14 @@ class One_Min_Hub_Container(Hub_Container):
 
                                 # 新中枢新的位置属性
                                 hub.pos = 'Down'
+
+                                # 2016-04-24
+                                # 如果买卖点已经激活,但却出现了一个反向的中枢,这是去激活买卖点
+                                if self.__bucket.isBucketAct() and self.__bucket.isEntryAct():
+
+                                    if self.__bucket.isSameTrending('Up'):
+
+                                        self.__bucket.deactEntry()
 
                                 # 调用扩张检查
                                 e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
@@ -2314,9 +2452,19 @@ class One_Min_Hub_Container(Hub_Container):
                                 # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
                                 if last_hub.pos == 'Down':
 
-                                    # 处理MACD力量判断
-                                    # 同时也是检查买卖点的时机
-                                    MACD_power()
+                                    # 2016-04-23
+                                    # 如果次级别走势形成,触发Bucket买卖点状态,同时传递次级别中枢最低点
+                                    if self.__bucket.isBucketAct() and self.__bucket.isSameTrending('Down'):
+
+                                        if self.__bucket.isEntryAct():
+
+                                        else:
+
+                                            self.__bucket.activeEntry(hub.ZD)
+
+                                            # 处理MACD力量判断
+                                            # 同时也是检查买卖点的时机
+                                        MACD_power()
 
                         # TODO: 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
                         # 前后两个中枢存在重叠区域,这种情况对中枢做合并
@@ -2430,14 +2578,20 @@ class Ten_Min_Bucket():
 
         # 2016-04-16
         # 状态机
-        self.__state = 0
-
-        # 2016-04-17
-        # 记录最后一个被记录的Candle的位置
-        self.__last_candle = 0
+        self.__state = False
 
         # 指向本级别的Candles容器指针,本级别的K线需要通过此容器读取
         self.__candles = candles
+
+        # 是否准备开始买卖点判断
+        self.__isEntry = False
+
+        # 买卖点进入操作价格点
+        # 实质就是次级别走势中枢区间的最高/最低点
+        self.__entry_price = 0
+
+        # 在一个买卖点未完成的清空下不能开始新的Bucket操作
+        self.__isFrozen = False
 
         self.candle_container = One_Min_Candle_Container()
 
@@ -2446,21 +2600,19 @@ class Ten_Min_Bucket():
 
         self.pens = Pen_Container(self.types)
 
-        self.hubs = One_Min_Hub_Container(self.pens)
+        self.hubs = One_Min_Hub_Container(self.pens, self)
 
-    def isActive(self):
+    def isBucketAct(self):
 
-        if self.__state == 0:
+        return self.__state
 
-            return False
+    # 激活Bucket的工作状态
+    # 传递盈利点价格
+    def activeBucket(self, exit_price):
 
-        else:
+        self.__state = True
 
-            return True
-
-    def active(self):
-
-        self.__state = 1
+        self.__exit_price = exit_price
 
     def __reset(self):
 
@@ -2469,20 +2621,20 @@ class Ten_Min_Bucket():
         self.types.reset()
         self.candle_container.reset()
 
-    def deactive(self):
+    def deactBucket(self):
 
-        self.__state = 0
+        self.__state = False
 
-        self.__last_candle = 0
+        self.__entry_price = 0
+
+        self.deactEntry()
 
         self.__reset()
-
-        print('Bucket Die!!!!!!!!!!!!')
 
     # 2016-04-13
     # 以高级别的笔做为次级别数据的生成条件
     def loadCandleID(self, t):
-        """
+
         print('Bucket代码调用--loadCandleID,高级别K线范围ID:', t)
 
         candle = self.__candles.container[t]
@@ -2497,8 +2649,151 @@ class Ten_Min_Bucket():
                                      candle.getMins(),
                                      self.types,
                                      self.pens,
-                                     self.hubs)
-        """
+                                     self.hubs,
+                                     self)
+
+    # 2016-04-23
+    # 加入Bucket的一个方向属性,这个属性用于记录当前的Bucket所对应的本级别的走势方向,次级别的走势方向只有和本级别一致的时候才有买卖点操作的机会
+    def setTrending(self, trend):
+
+        self.__trend = trend
+
+    def isSameTrending(self, trend):
+
+        if self.__trend == trend:
+
+            return True
+
+        else:
+            return False
+
+    def activeEntry(self, entry_price):
+
+        # 2016-04-24
+        # 如果买卖点已经激活,不会再激活第二次,防止连续出现同向中枢的时候entry_price被连续更新
+        if self.__isEntry:
+
+            return
+
+        self.__entry_price = entry_price
+
+        self.__isEntry = True
+
+    def deactEntry(self):
+
+        self.__isEntry = False
+
+        self.__entry_price = 0
+
+    def isEntryAct(self):
+
+        return self.__isEntry
+
+    def isExecutable(self, price):
+
+        if self.__isEntry and self.__state:
+
+            # short
+            if self.__trend == 'Up':
+
+                if price >= self.__entry_price:
+
+                    trader.exit = self.__exit_price
+                    trader.traded = price
+                    trader.stop = trader.stopping()
+                    trader.isLong = False
+
+                    # 2016-04-24
+                    # 一旦成功进行买卖操作,当前Bucket的状态数据应该全部清空.并且在当前买卖未完成的清空下,不应该再出现新的Buckect
+                    self.froBucket()
+
+            # long
+            else:
+
+                if price <= self.__entry_price:
+
+                    trader.exit = self.__exit_price
+                    trader.traded = price
+                    trader.stop = trader.stopping()
+                    trader.isLong = True
+
+                    # 2016-04-24
+                    # 一旦成功进行买卖操作,当前Bucket的状态数据应该全部清空.并且在当前买卖未完成的清空下,不应该再出现新的Buckect
+                    self.froBucket()
+
+
+    def isFrozen(self):
+
+        return self.__isFrozen
+
+    def froBucket(self):
+
+        self.__isFrozen = True
+
+        self.deactBucket()
+
+    def deFroBucket(self):
+
+        self.__isFrozen = False
+
+class trader:
+
+    # 成交位
+    traded = -1
+
+    # 获利了解位
+    exit = 0
+
+    # 止损位
+    stop = 0
+
+    # True -- Long
+    # False --  Short
+    isLong = True
+
+    @staticmethod
+    # 2016-04-23
+    # 止损位设定
+    def stopping():
+
+        return 2 * trader.traded - trader.exit
+
+    @staticmethod
+    # 2016-04-24
+    # 如果实际交易成功返回True
+    def isTrading(price):
+
+        if trader.traded != -1:
+
+            if trader.isLong:
+
+                if price > trader.exit:
+
+                    print('Long Profit Taken:', price - trader.traded)
+
+                elif price < trader.stop:
+
+                    print('Long Stop Lost:', price - trader.traded)
+
+            else:
+
+                if price < trader.exit:
+
+                    print('Short Profit Taken:', trader.traded - price)
+
+                elif price > trader.stop:
+
+                    print('Short Stop Lost:', trader.traded - price)
+
+            trader.traded = -1
+
+            return True
+
+        else:
+
+            return False
+
+
 def test(year, month, count):
 
     candles = Ten_Min_Candle_Container()
@@ -2521,165 +2816,348 @@ def test(year, month, count):
 
     ax_2 = plt.subplot(212)
 
-    draw_stocks(candles.container, types.container, ax_1, ax_2)
+    Ten_Min_Drawer.draw_stocks(candles.container, types.container, ax_1)
 
-    draw_pens(candles.container, pens.container, ax_1)
+    Ten_Min_Drawer.draw_pens(candles.container, pens.container, ax_1)
 
-    draw_hub(candles.container, hubs.container, ax_1)
+    Ten_Min_Drawer.draw_hub(candles.container, hubs.container, ax_1)
 
-    draw_stocks(b.candle_container.container, b.types.container, ax_2, ax_1)
+    One_Min_Drawer.draw_stocks(b.candle_container.container, b.types.container, ax_2)
 
-    draw_pens(b.candle_container.container, b.pens.container, ax_2)
+    One_Min_Drawer.draw_pens(b.candle_container.container, b.pens.container, ax_2)
 
-    draw_hub(b.candle_container.container, b.hubs.container, ax_2)
+    One_Min_Drawer.draw_hub(b.candle_container.container, b.hubs.container, ax_2)
 
     Candle_Container.closeDB()
 
+class Ten_Min_Drawer:
 
-# 画K线算法.内部采用了双层遍历,算法简单,但性能一般
-def draw_stocks(stocks, types, ax_1, ax_2):
+    # 画K线算法.内部采用了双层遍历,算法简单,但性能一般
+    @staticmethod
+    def draw_stocks(stocks, types, ax_1):
 
-    c = 'b'
+        c = 'b'
 
-    piexl_x = []
-
-    """
-    DIF = []
-    DEA = []
-    MACD = []
-    """
-
-    height = []
-    low = []
-    c = []
-
-    for i in range(len(stocks)):
-
-        piexl_x.append(i)
+        piexl_x = []
 
         """
-        DIF.append(stocks[i]['DIF'])
-        DEA.append(stocks[i]['DEA'])
-        MACD.append(stocks[i]['MACD'])
+        DIF = []
+        DEA = []
+        MACD = []
         """
 
-        height.append(stocks[i].getHigh() - stocks[i].getLow())
-        low.append(stocks[i].getLow())
+        height = []
+        low = []
+        c = []
 
-        j = 0
-        c.append('g')
+        for i in range(len(stocks)):
 
-        while j < len(types):
+            piexl_x.append(i)
 
-            if pd.Timestamp(pd.datetime(stocks[i].getYear(),
-                                        stocks[i].getMonth(),
-                                        stocks[i].getDay(),
-                                        stocks[i].getHour(),
-                                        stocks[i].getMins())) == \
-                    pd.datetime(types[j].candle.getYear(),
-                                types[j].candle.getMonth(),
-                                types[j].candle.getDay(),
-                                types[j].candle.getHour(),
-                                types[j].candle.getMins()):
+            """
+            DIF.append(stocks[i]['DIF'])
+            DEA.append(stocks[i]['DEA'])
+            MACD.append(stocks[i]['MACD'])
+            """
 
-                c[i] = 'r'
-                break
+            height.append(stocks[i].getHigh() - stocks[i].getLow())
+            low.append(stocks[i].getLow())
 
+            j = 0
+            c.append('g')
+
+            while j < len(types):
+
+                if pd.Timestamp(pd.datetime(stocks[i].getYear(),
+                                            stocks[i].getMonth(),
+                                            stocks[i].getDay(),
+                                            stocks[i].getHour(),
+                                            stocks[i].getMins())) == \
+                        pd.datetime(types[j].candle.getYear(),
+                                    types[j].candle.getMonth(),
+                                    types[j].candle.getDay(),
+                                    types[j].candle.getHour(),
+                                    types[j].candle.getMins()):
+
+                    c[i] = 'r'
+                    break
+
+                else:
+                    j += 1
+
+        ax_1.bar(piexl_x, height, 0.8, low, color = c)
+
+        """
+        ax_2.plot(piexl_x, DIF, color='#9999ff')
+        ax_2.plot(piexl_x, DEA, color='#ff9999')
+        ax_2.bar(piexl_x, MACD, 0.8, color='g')
+        """
+
+    @staticmethod
+    def draw_pens(stocks, pens, ax):
+
+        date_index = {pd.Timestamp(pd.datetime(stocks[i].getYear(),
+                                               stocks[i].getMonth(),
+                                               stocks[i].getDay(),
+                                               stocks[i].getHour(),
+                                               stocks[i].getMins())).strftime('%Y-%m-%d %H:%M:%S'): i for i in range(len(stocks))}
+
+        piexl_x = []
+        piexl_y = []
+
+        for j in range(len(pens)):
+
+            # 利用已经初始化的Date:Index字典,循环遍历pens数组以寻找其对于时间为关键值的X轴坐标位置
+            # 添加起点
+            piexl_x.append(date_index[pd.Timestamp(pd.datetime(pens[j].beginType.candle.getYear(),
+                                                               pens[j].beginType.candle.getMonth(),
+                                                               pens[j].beginType.candle.getDay(),
+                                                               pens[j].beginType.candle.getHour(),
+                                                               pens[j].beginType.candle.getMins())).strftime('%Y-%m-%d %H:%M:%S')])
+
+            # 添加终点
+            piexl_x.append(date_index[pd.Timestamp(pd.datetime(pens[j].endType.candle.getYear(),
+                                                               pens[j].endType.candle.getMonth(),
+                                                               pens[j].endType.candle.getDay(),
+                                                               pens[j].endType.candle.getHour(),
+                                                               pens[j].endType.candle.getMins())).strftime('%Y-%m-%d %H:%M:%S')])
+
+            if pens[j].pos == 'Down':
+
+                # 如果笔的朝向向下,那么画线的起点为顶分型的高点,终点为底分型的低点
+                piexl_y.append(pens[j].beginType.candle.getHigh())
+                piexl_y.append(pens[j].endType.candle.getLow())
+
+            # 如果笔的朝向向上,那么画线的起点为底分型的低点,终点为顶分型的高点
             else:
-                j += 1
 
-    ax_1.bar(piexl_x, height, 0.8, low, color = c)
+                piexl_y.append(pens[j].beginType.candle.getLow())
+                piexl_y.append(pens[j].endType.candle.getHigh())
 
-    """
-    ax_2.plot(piexl_x, DIF, color='#9999ff')
-    ax_2.plot(piexl_x, DEA, color='#ff9999')
-    ax_2.bar(piexl_x, MACD, 0.8, color='g')
-    """
+        # 画线程序调用
+        ax.plot(piexl_x, piexl_y, color='m')
 
-def draw_pens(stocks, pens, ax):
+    # 画中枢
+    @staticmethod
+    def draw_hub(stocks, hubs, ax):
 
-    date_index = {pd.Timestamp(pd.datetime(stocks[i].getYear(),
-                                           stocks[i].getMonth(),
-                                           stocks[i].getDay(),
-                                           stocks[i].getHour(),
-                                           stocks[i].getMins())).strftime('%Y-%m-%d %H:%M:%S'): i for i in range(len(stocks))}
+        date_index = {pd.Timestamp(pd.datetime(stocks[i].getYear(),
+                                               stocks[i].getMonth(),
+                                               stocks[i].getDay(),
+                                               stocks[i].getHour(),
+                                               stocks[i].getMins())).strftime('%Y-%m-%d %H:%M:%S'): i for i in range(len(stocks))}
 
-    piexl_x = []
-    piexl_y = []
+        for i in range(len(hubs)):
 
-    for j in range(len(pens)):
+            # Rectangle x
 
-        # 利用已经初始化的Date:Index字典,循环遍历pens数组以寻找其对于时间为关键值的X轴坐标位置
-        # 添加起点
-        piexl_x.append(date_index[pd.Timestamp(pd.datetime(pens[j].beginType.candle.getYear(),
-                                                           pens[j].beginType.candle.getMonth(),
-                                                           pens[j].beginType.candle.getDay(),
-                                                           pens[j].beginType.candle.getHour(),
-                                                           pens[j].beginType.candle.getMins())).strftime('%Y-%m-%d %H:%M:%S')])
+            start_date = pd.Timestamp(pd.datetime(hubs[i].s_pen.beginType.candle.getYear(),
+                                                  hubs[i].s_pen.beginType.candle.getMonth(),
+                                                  hubs[i].s_pen.beginType.candle.getDay(),
+                                                  hubs[i].s_pen.beginType.candle.getHour(),
+                                                  hubs[i].s_pen.beginType.candle.getMins())).strftime('%Y-%m-%d %H:%M:%S')
 
-        # 添加终点
-        piexl_x.append(date_index[pd.Timestamp(pd.datetime(pens[j].endType.candle.getYear(),
-                                                           pens[j].endType.candle.getMonth(),
-                                                           pens[j].endType.candle.getDay(),
-                                                           pens[j].endType.candle.getHour(),
-                                                           pens[j].endType.candle.getMins())).strftime('%Y-%m-%d %H:%M:%S')])
+            x = date_index[start_date]
 
-        if pens[j].pos == 'Down':
+            # Rectangle y
+            y = hubs[i].ZD
 
-            # 如果笔的朝向向下,那么画线的起点为顶分型的高点,终点为底分型的低点
-            piexl_y.append(pens[j].beginType.candle.getHigh())
-            piexl_y.append(pens[j].endType.candle.getLow())
+            # Rectangle width
+            end_date = pd.Timestamp(pd.datetime(hubs[i].e_pen.endType.candle.getYear(),
+                                                hubs[i].e_pen.endType.candle.getMonth(),
+                                                hubs[i].e_pen.endType.candle.getDay(),
+                                                hubs[i].e_pen.endType.candle.getHour(),
+                                                hubs[i].e_pen.endType.candle.getMins())).strftime('%Y-%m-%d %H:%M:%S')
 
-        # 如果笔的朝向向上,那么画线的起点为底分型的低点,终点为顶分型的高点
-        else:
+            w = date_index[end_date] - date_index[start_date]
 
-            piexl_y.append(pens[j].beginType.candle.getLow())
-            piexl_y.append(pens[j].endType.candle.getHigh())
+            # print('Hub--', i ,'B--', start_date, 'E--', end_date, 'W--', w, 'GG--', hubs[i]['GG'], 'DD--', hubs[i]['DD'])
 
-    # 画线程序调用
-    ax.plot(piexl_x, piexl_y, color='m')
+            # Rectangle height
+            h = hubs[i].ZG - hubs[i].ZD
 
-# 画中枢
-def draw_hub(stocks, hubs, ax):
+            #if hubs[i]['Level'] == 3:
+            #   ax.add_patch(patches.Rectangle((x,y), w, h, color='r', fill=False))
 
-    date_index = {pd.Timestamp(pd.datetime(stocks[i].getYear(),
-                                           stocks[i].getMonth(),
-                                           stocks[i].getDay(),
-                                           stocks[i].getHour())).strftime('%Y-%m-%d %H:%M:%S'): i for i in range(len(stocks))}
+            #else:
 
-    for i in range(len(hubs)):
+            ax.add_patch(patches.Rectangle((x,y), w, h, color='y', fill=False))
+class Buyer:
 
-        # Rectangle x
+    def __init__(self):
 
-        start_date = pd.Timestamp(pd.datetime(hubs[i].s_pen.beginType.candle.getYear(),
-                                              hubs[i].s_pen.beginType.candle.getMonth(),
-                                              hubs[i].s_pen.beginType.candle.getDay(),
-                                              hubs[i].s_pen.beginType.candle.getHour())).strftime('%Y-%m-%d %H:%M:%S')
+        print('')
 
-        x = date_index[start_date]
+    @staticmethod
+    def buy(self, price):
 
-        # Rectangle y
-        y = hubs[i].ZD
+        print('buying:',price)
 
-        # Rectangle width
-        end_date = pd.Timestamp(pd.datetime(hubs[i].e_pen.endType.candle.getYear(),
-                                            hubs[i].e_pen.endType.candle.getMonth(),
-                                            hubs[i].e_pen.endType.candle.getDay(),
-                                            hubs[i].e_pen.endType.candle.getHour())).strftime('%Y-%m-%d %H:%M:%S')
+class Seller:
 
-        w = date_index[end_date] - date_index[start_date]
+    def __init__(self):
 
-        # print('Hub--', i ,'B--', start_date, 'E--', end_date, 'W--', w, 'GG--', hubs[i]['GG'], 'DD--', hubs[i]['DD'])
+        print('')
 
-        # Rectangle height
-        h = hubs[i].ZG - hubs[i].ZD
+    @staticmethod
+    def selling(self, price):
 
-        #if hubs[i]['Level'] == 3:
-        #   ax.add_patch(patches.Rectangle((x,y), w, h, color='r', fill=False))
+        print('selling:', price)
 
-        #else:
+class One_Min_Drawer:
 
-        ax.add_patch(patches.Rectangle((x,y), w, h, color='y', fill=False))
+    # 画K线算法.内部采用了双层遍历,算法简单,但性能一般
+    @staticmethod
+    def draw_stocks(stocks, types, ax_1):
+
+        c = 'b'
+
+        piexl_x = []
+
+        """
+        DIF = []
+        DEA = []
+        MACD = []
+        """
+
+        height = []
+        low = []
+        c = []
+
+        for i in range(len(stocks)):
+
+            piexl_x.append(i)
+
+            height.append(stocks[i].getHigh() - stocks[i].getLow())
+            low.append(stocks[i].getLow())
+
+            j = 0
+            c.append('g')
+
+            while j < len(types):
+
+                if pd.Timestamp(pd.datetime(stocks[i].getYear(),
+                                            stocks[i].getMonth(),
+                                            stocks[i].getDay(),
+                                            stocks[i].getHour(),
+                                            stocks[i].getMins(),
+                                            stocks[i].getMin())) == \
+                        pd.datetime(types[j].candle.getYear(),
+                                    types[j].candle.getMonth(),
+                                    types[j].candle.getDay(),
+                                    types[j].candle.getHour(),
+                                    types[j].candle.getMins(),
+                                    types[j].candle.getMin()):
+
+                    c[i] = 'r'
+                    break
+
+                else:
+                    j += 1
+
+        ax_1.bar(piexl_x, height, 0.8, low, color = c)
+
+        """
+        ax_2.plot(piexl_x, DIF, color='#9999ff')
+        ax_2.plot(piexl_x, DEA, color='#ff9999')
+        ax_2.bar(piexl_x, MACD, 0.8, color='g')
+        """
+
+    @staticmethod
+    def draw_pens(stocks, pens, ax):
+
+        date_index = {pd.Timestamp(pd.datetime(stocks[i].getYear(),
+                                               stocks[i].getMonth(),
+                                               stocks[i].getDay(),
+                                               stocks[i].getHour(),
+                                               stocks[i].getMins(),
+                                               stocks[i].getMin())).strftime('%Y-%m-%d %H:%M:%S'): i for i in range(len(stocks))}
+
+        piexl_x = []
+        piexl_y = []
+
+        for j in range(len(pens)):
+
+            # 利用已经初始化的Date:Index字典,循环遍历pens数组以寻找其对于时间为关键值的X轴坐标位置
+            # 添加起点
+            piexl_x.append(date_index[pd.Timestamp(pd.datetime(pens[j].beginType.candle.getYear(),
+                                                               pens[j].beginType.candle.getMonth(),
+                                                               pens[j].beginType.candle.getDay(),
+                                                               pens[j].beginType.candle.getHour(),
+                                                               pens[j].beginType.candle.getMins(),
+                                                               pens[j].beginType.candle.getMin())).strftime('%Y-%m-%d %H:%M:%S')])
+
+            # 添加终点
+            piexl_x.append(date_index[pd.Timestamp(pd.datetime(pens[j].endType.candle.getYear(),
+                                                               pens[j].endType.candle.getMonth(),
+                                                               pens[j].endType.candle.getDay(),
+                                                               pens[j].endType.candle.getHour(),
+                                                               pens[j].endType.candle.getMins(),
+                                                               pens[j].endType.candle.getMin())).strftime('%Y-%m-%d %H:%M:%S')])
+
+            if pens[j].pos == 'Down':
+
+                # 如果笔的朝向向下,那么画线的起点为顶分型的高点,终点为底分型的低点
+                piexl_y.append(pens[j].beginType.candle.getHigh())
+                piexl_y.append(pens[j].endType.candle.getLow())
+
+            # 如果笔的朝向向上,那么画线的起点为底分型的低点,终点为顶分型的高点
+            else:
+
+                piexl_y.append(pens[j].beginType.candle.getLow())
+                piexl_y.append(pens[j].endType.candle.getHigh())
+
+        # 画线程序调用
+        ax.plot(piexl_x, piexl_y, color='m')
+
+    # 画中枢
+    @staticmethod
+    def draw_hub(stocks, hubs, ax):
+
+        date_index = {pd.Timestamp(pd.datetime(stocks[i].getYear(),
+                                               stocks[i].getMonth(),
+                                               stocks[i].getDay(),
+                                               stocks[i].getHour(),
+                                               stocks[i].getMins(),
+                                               stocks[i].getMin())).strftime('%Y-%m-%d %H:%M:%S'): i for i in range(len(stocks))}
+
+        for i in range(len(hubs)):
+
+            # Rectangle x
+
+            start_date = pd.Timestamp(pd.datetime(hubs[i].s_pen.beginType.candle.getYear(),
+                                                  hubs[i].s_pen.beginType.candle.getMonth(),
+                                                  hubs[i].s_pen.beginType.candle.getDay(),
+                                                  hubs[i].s_pen.beginType.candle.getHour(),
+                                                  hubs[i].s_pen.beginType.candle.getMins(),
+                                                  hubs[i].s_pen.beginType.candle.getMin())).strftime('%Y-%m-%d %H:%M:%S')
+
+            x = date_index[start_date]
+
+            # Rectangle y
+            y = hubs[i].ZD
+
+            # Rectangle width
+            end_date = pd.Timestamp(pd.datetime(hubs[i].e_pen.endType.candle.getYear(),
+                                                hubs[i].e_pen.endType.candle.getMonth(),
+                                                hubs[i].e_pen.endType.candle.getDay(),
+                                                hubs[i].e_pen.endType.candle.getHour(),
+                                                hubs[i].e_pen.endType.candle.getMins(),
+                                                hubs[i].e_pen.endType.candle.getMin())).strftime('%Y-%m-%d %H:%M:%S')
+
+            w = date_index[end_date] - date_index[start_date]
+
+            # print('Hub--', i ,'B--', start_date, 'E--', end_date, 'W--', w, 'GG--', hubs[i]['GG'], 'DD--', hubs[i]['DD'])
+
+            # Rectangle height
+            h = hubs[i].ZG - hubs[i].ZD
+
+            #if hubs[i]['Level'] == 3:
+            #   ax.add_patch(patches.Rectangle((x,y), w, h, color='r', fill=False))
+
+            #else:
+
+            ax.add_patch(patches.Rectangle((x,y), w, h, color='y', fill=False))
 
 
 def close():
