@@ -251,7 +251,7 @@ class Hour_Candle_Container(Candle_Container):
 
     # 2016-04-12
     # 由于目前采用的是数据库历史数据加载,使用的是函数内循环调用.在真实的情况应该是出现一次K线调用一次
-    # TODO: 对于次级别数据处理的最简单方式就是在如同调用types,pens,hubs处理一样,一旦出现了新的本级别K线,就去判断某些如同标志位之类的东西
+    # 对于次级别数据处理的最简单方式就是在如同调用types,pens,hubs处理一样,一旦出现了新的本级别K线,就去判断某些如同标志位之类的东西
     # 如果标志位有效,则加载次级别数据,并同时处理类似本级别这样的type,pens,hubs结构变化的信息
     # 该如何改变标志位取决于中枢的走势以及本级别笔与中枢的变化关系
     def loadDB(self, year, month, count, types, pens, hubs):
@@ -317,7 +317,7 @@ class Ten_Min_Candle_Container(Candle_Container):
 
         Candle_Container.__init__(self)
 
-    def loadDB(self, year, month, count, types, pens, hubs):
+    def loadDB(self, year, month, count, skips, types, pens, hubs):
 
         if count > Ten_Min_Candle_Container.collector.count():
 
@@ -327,7 +327,7 @@ class Ten_Min_Candle_Container(Candle_Container):
 
         try:
 
-            self.cursor = Ten_Min_Candle_Container.collector.find({'Year': year, 'Month': month}, limit=count)
+            self.cursor = Ten_Min_Candle_Container.collector.find({'Year': year, 'Month': month}, limit=count, skip=skips)
 
         except BaseException:
 
@@ -347,7 +347,7 @@ class Ten_Min_Candle_Container(Candle_Container):
             # 因为如果等待笔形成后再读取,由于笔的可变性,很容易出现漏读的情况
             self.dumpBucket()
 
-            self.trading(d['Close'])
+            self.trading(m)
 
             types.insertType(m)
 
@@ -364,11 +364,11 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             self.__bucket.loadCandleID(i)
 
-    def trading(self, p):
+    def trading(self, candle):
 
-        self.__bucket.isExecutable(p)
+        self.__bucket.isExecutable(candle)
 
-        if trader.isTrading(p):
+        if trader.isTrading(candle):
 
             self.__bucket.deFroBucket()
 
@@ -419,7 +419,7 @@ class One_Min_Candle_Container(Candle_Container):
 
             self.container.append(m)
 
-            print('One_Min_Candle_Container代码调用--loadDB:', d['Year'],d['Month'],d['Day'],d['Hour'],d['Min'],d['Min_1'])
+            # print('One_Min_Candle_Container代码调用--loadDB:', d['Year'],d['Month'],d['Day'],d['Hour'],d['Min'],d['Min_1'])
 
             # 在进行容器初始化加载历史数据的时候,同时对这部分数据进行包含处理
             self.contains()
@@ -503,11 +503,13 @@ class Type_Container:
 
                 t = Up_Typer(cur_candle, 0)
 
+                self.container.append(t)
+
             elif cur_high < pos_high and cur_low < pos_low:
 
                 t = Down_Typer(cur_candle, 0)
 
-            self.container.append(t)
+                self.container.append(t)
 
             return
 
@@ -1451,11 +1453,16 @@ class Hub_Container:
                 cur_index = i
 
                 # 刷新中枢重叠区间
+
+                # 2016-04-30
+                # 删除中枢扩张部分对原始中枢区间的修改
+                """
                 hub.ZG = min_high
                 hub.ZD = max_low
 
                 hub_ZG = hub.ZG
                 hub_ZD = hub.ZD
+                """
 
                 # 2016-04-11
                 # 取消扩张部分对中枢区间的修改
@@ -1663,14 +1670,14 @@ class Hour_Hub_Container(Hub_Container):
 
                                 # 新中枢新的位置属性
                                 hub.pos = 'Up'
-                                # TODO 2016-04-17: 如果Bucket处于激活状态,请首先去激活并复位
-                                # TODO 2016-04-17: 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
+                                # 如果Bucket处于激活状态,请首先去激活并复位
+                                # 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
 
                                 # 2016-04-17
                                 # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,都说明了当前处于激活状态的Bucket已经没有意义
                                 if self.__bucket.isActive():
 
-                                    self.__bucket.deactive()
+                                    self.__bucket.deactBucket()
 
                                 # 2016-04-11
                                 # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
@@ -1701,12 +1708,8 @@ class Hour_Hub_Container(Hub_Container):
                                 # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
                                 # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
 
-                                # TODO 2016-04-17: 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
+                                # 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
                                 if last_hub.pos == 'Up':
-
-                                    # 处理MACD力量判断
-                                    # 同时也是检查买卖点的时机
-                                    MACD_power()
 
                                     # 2016-04-17
                                     # 只有在本级别中枢最后确认为趋势形成的时候才激活Bucket
@@ -1734,14 +1737,14 @@ class Hour_Hub_Container(Hub_Container):
                                 # 新中枢新的位置属性
                                 hub.pos = 'Down'
 
-                                # TODO 2016-04-17: 如果Bucket处于激活状态,请首先去激活并复位
-                                # TODO 2016-04-17: 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
+                                # 如果Bucket处于激活状态,请首先去激活并复位
+                                # 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
 
                                 # 2016-04-17
                                 # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,都说明了当前处于激活状态的Bucket已经没有意义
-                                if self.__bucket.isActive():
+                                if self.__bucket.isBucketAct():
 
-                                    self.__bucket.deactive()
+                                    self.__bucket.deactBucket()
 
                                 # 调用扩张检查
                                 e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
@@ -1767,15 +1770,11 @@ class Hour_Hub_Container(Hub_Container):
                                 # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
                                 if last_hub.pos == 'Down':
 
-                                    # 处理MACD力量判断
-                                    # 同时也是检查买卖点的时机
-                                    MACD_power()
-
-                                    # TODO 2016-04-17: 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
+                                    # 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
                                     # 2016-04-17
                                     # 只有在本级别中枢最后确认为趋势形成的时候才激活Bucket
                                     # Bucket牵扯到多次数据库的读取,控制必要的读取次数也就是优化效率
-                                    self.__bucket.active()
+                                    self.__bucket.activeBucket()
 
                                     print('中枢生成次级别数据加载笔坐标', self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
                                           self.pens.container[len(self.pens.container) - 1].endType.candle_index)
@@ -1785,7 +1784,7 @@ class Hour_Hub_Container(Hub_Container):
 
                                         self.__bucket.loadCandleID(t)
 
-                        # TODO: 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
+                        # 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
                         # 前后两个中枢存在重叠区域,这种情况对中枢做合并
                         # 暂时没有实现,仅仅忽略中枢添加入队列,并且挪到笔
                         else:
@@ -1965,19 +1964,29 @@ class Ten_Min_Hub_Container(Hub_Container):
 
                                 # 新中枢新的位置属性
                                 hub.pos = 'Up'
-                                # TODO 2016-04-17: 如果Bucket处于激活状态,请首先去激活并复位
-                                # TODO 2016-04-17: 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
+                                # 如果Bucket处于激活状态,请首先去激活并复位
+                                # 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
 
                                 # 2016-04-17
                                 # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,都说明了当前处于激活状态的Bucket已经没有意义
                                 if self.__bucket.isBucketAct():
+
+                                    print('Ten_Min_Hub_Container.insertHub()--新中枢生成,Bucket处于激活状态, 方向--UP')
 
                                     # 2016-04-23
                                     # 只有在新的中枢是反向中枢的时候才去激活,延迟了去激活时间
                                     # 目的: 背驰段可能出现在本级别的盘整中枢延伸的过程中
                                     if self.__bucket.isSameTrending('Down'):
 
+                                        print('Ten_Min_Hub_Container.insertHub()--新中枢和Bucket方向相反,Bucket去激活')
+
+                                        counter.down_bucket_break += 1
+
                                         self.__bucket.deactBucket()
+
+                                    else:
+
+                                        print('Ten_Min_Hub_Container.insertHub()--新中枢和Bucket方向相同,不处理')
 
                                 # 2016-04-11
                                 # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
@@ -2022,27 +2031,40 @@ class Ten_Min_Hub_Container(Hub_Container):
                                     # 可能出现的缺点是如果市场一直在Exit和Stop之间的区间不断波动,那么程序就处于不交易状态,当然如何Exit和Stop
                                     # 的差合理,这样的波动本质上就是中枢的构造过程,不应该操作.
                                     # 所以Exit和Stop的设定很重要
-                                    # TODO 是否考虑在交易保存激活的时候不再做Bucket更新
+                                    # TODO 2016-04-26 关于交易保存激活的时候是否可以继续做Bucket更新的思考
                                     if self.__bucket.isFrozen() != True:
+
+                                        print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于非交易状态')
 
                                         if self.__bucket.isBucketAct():
 
+                                            print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态')
+
                                             # 2016-04-26
                                             # 相邻的一个中枢没有附着Bucket
-                                            #
                                             if last_hub.isSticky != True:
+
+                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢没有附着Bucket')
 
                                                 self.__bucket.deactBucket()
 
+                                                print('Ten_Min_Hub_Container.insertHub()--去激活Bucket')
+
                                                 self.__bucket.activeBucket(hub.ZG)
 
-                                                self.isSticky = True
+                                                counter.up_bucket_act += 1
+
+                                                print('Ten_Min_Hub_Container.insertHub()--重新激活Bucket为ZG,Exit', hub.ZG)
+
+                                                hub.isSticky = True
 
                                                 # 2016-04-23
                                                 # 配置Bucket走势方向属性
                                                 self.__bucket.setTrending('Up')
 
-                                                print('中枢生成次级别数据加载笔坐标',
+                                                print('Ten_Min_Hub_Container.insertHub()--Bucket方向:UP')
+
+                                                print('Ten_Min_Hub_Container.insertHub()--中枢生成次级别数据加载笔范围',
                                                       self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
                                                       self.pens.container[len(self.pens.container) - 1].endType.candle_index)
 
@@ -2056,19 +2078,29 @@ class Ten_Min_Hub_Container(Hub_Container):
                                             # 不对Bucket做任何处理
                                             else:
 
-                                                self.isSticky = False
+                                                hub.isSticky = False
+
+                                                counter.up_stick += 1
+
+                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢附着Bucket,不做处理')
 
                                         else:
 
+                                            print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于非激活状态,直接激活Bucket')
+
                                             self.__bucket.activeBucket(hub.ZG)
 
-                                            self.isSticky = True
+                                            counter.up_bucket_act += 1
+
+                                            hub.isSticky = True
 
                                             # 2016-04-23
                                             # 配置Bucket走势方向属性
                                             self.__bucket.setTrending('Up')
 
-                                            print('中枢生成次级别数据加载笔坐标',
+                                            print('Ten_Min_Hub_Container.insertHub()--Bucket方向:UP')
+
+                                            print('Ten_Min_Hub_Container.insertHub()--中枢生成次级别数据加载笔范围',
                                                   self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
                                                   self.pens.container[len(self.pens.container) - 1].endType.candle_index)
 
@@ -2076,6 +2108,10 @@ class Ten_Min_Hub_Container(Hub_Container):
                                                            self.pens.container[len(self.pens.container) - 1].endType.candle_index):
 
                                                 self.__bucket.loadCandleID(t)
+
+                                    else:
+
+                                        print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于交易状态,不做任何处理')
 
                         # 新中枢在向下的方向,则新中枢第一笔应该是向上笔
                         elif hub.ZG < last_hub.ZD:
@@ -2090,19 +2126,29 @@ class Ten_Min_Hub_Container(Hub_Container):
                                 # 新中枢新的位置属性
                                 hub.pos = 'Down'
 
-                                # TODO 2016-04-17: 如果Bucket处于激活状态,请首先去激活并复位
-                                # TODO 2016-04-17: 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
+                                # 如果Bucket处于激活状态,请首先去激活并复位
+                                # 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
 
                                 # 2016-04-17
                                 # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,都说明了当前处于激活状态的Bucket已经没有意义
                                 if self.__bucket.isBucketAct():
+
+                                    print('Ten_Min_Hub_Container.insertHub()--新中枢生成,Bucket处于激活状态,方向--Down')
 
                                     # 2016-04-23
                                     # 只有在新的中枢是反向中枢的时候才去激活,延迟了去激活时间
                                     # 目的: 背驰段可能出现在本级别的盘整中枢延伸的过程中
                                     if self.__bucket.isSameTrending('Up'):
 
+                                        print('Ten_Min_Hub_Container.insertHub()--新中枢和Bucket方向相反,Bucket去激活 ')
+
+                                        counter.up_bucket_break += 1
+
                                         self.__bucket.deactBucket()
+
+                                    else:
+
+                                        print('Ten_Min_Hub_Container.insertHub()--新中枢和Bucket方向相同,不处理')
 
                                 # 调用扩张检查
                                 e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
@@ -2128,12 +2174,14 @@ class Ten_Min_Hub_Container(Hub_Container):
                                 # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
                                 if last_hub.pos == 'Down':
 
-                                    # TODO 2016-04-17: 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
+                                    # 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
                                     # 2016-04-17
                                     # 只有在本级别中枢最后确认为趋势形成的时候才激活Bucket
                                     # Bucket牵扯到多次数据库的读取,控制必要的读取次数也就是优化效率
 
                                     if self.__bucket.isFrozen() != True:
+
+                                        print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于非交易状态')
 
                                         if self.__bucket.isBucketAct():
 
@@ -2142,17 +2190,27 @@ class Ten_Min_Hub_Container(Hub_Container):
                                             #
                                             if last_hub.isSticky != True:
 
+                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢没有附着Bucket')
+
                                                 self.__bucket.deactBucket()
+
+                                                print('Ten_Min_Hub_Container.insertHub()--去激活Bucket')
 
                                                 self.__bucket.activeBucket(hub.ZD)
 
-                                                self.isSticky = True
+                                                counter.down_bucket_act += 1
+
+                                                print('Ten_Min_Hub_Container.insertHub()--重新激活Bucket,Exit为ZD', hub.ZD)
+
+                                                hub.isSticky = True
 
                                                 # 2016-04-23
                                                 # 配置Bucket走势方向属性
                                                 self.__bucket.setTrending('Down')
 
-                                                print('中枢生成次级别数据加载笔坐标',
+                                                print('Ten_Min_Hub_Container.insertHub()--Bucket方向:DOWN')
+
+                                                print('Ten_Min_Hub_Container.insertHub()--中枢生成次级别数据加载笔范围',
                                                       self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
                                                       self.pens.container[len(self.pens.container) - 1].endType.candle_index)
 
@@ -2166,19 +2224,29 @@ class Ten_Min_Hub_Container(Hub_Container):
                                             # 不对Bucket做任何处理
                                             else:
 
-                                                self.isSticky = False
+                                                hub.isSticky = False
+
+                                                counter.down_stick += 1
+
+                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢附着Bucket,不做处理')
 
                                         else:
 
                                             self.__bucket.activeBucket(hub.ZD)
 
-                                            self.isSticky = True
+                                            counter.down_bucket_act += 1
+
+                                            print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于非激活状态,直接激活Bucket')
+
+                                            print('Ten_Min_Hub_Container.insertHub()--Bucket方向:Down')
+
+                                            hub.isSticky = True
 
                                             # 2016-04-23
                                             # 配置Bucket走势方向属性
-                                            self.__bucket.setTrending('Up')
+                                            self.__bucket.setTrending('Down')
 
-                                            print('中枢生成次级别数据加载笔坐标',
+                                            print('Ten_Min_Hub_Container.insertHub()--中枢生成次级别数据加载笔范围',
                                                   self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
                                                   self.pens.container[len(self.pens.container) - 1].endType.candle_index)
 
@@ -2186,6 +2254,9 @@ class Ten_Min_Hub_Container(Hub_Container):
                                                            self.pens.container[len(self.pens.container) - 1].endType.candle_index):
 
                                                 self.__bucket.loadCandleID(t)
+                                    else:
+
+                                        print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于交易状态,不做任何处理')
 
                         # TODO: 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
                         # 前后两个中枢存在重叠区域,这种情况对中枢做合并
@@ -2358,9 +2429,18 @@ class One_Min_Hub_Container(Hub_Container):
                                 # 如果买卖点已经激活,但却出现了一个反向的中枢,这是去激活买卖点
                                 if self.__bucket.isBucketAct() and self.__bucket.isEntryAct():
 
+                                    print('One_Min_Hub_C.insertHub()--新中枢生成,Bucket处于激活并且Entry处于激活')
+
+                                    #  出现了反向中枢的情况下马上去激活买卖点
                                     if self.__bucket.isSameTrending('Down'):
 
+                                        print('One_Min_Hub_C.insertHub()--新中枢生成,Bucket处于激活并且Entry处于激活,新中枢方向为Down与Bucket相反,Entry去激活')
+
                                         self.__bucket.deactEntry()
+
+                                    else:
+
+                                        print('One_Min_Hub_C.insertHub()--新中枢生成,Bucket处于激活并且Entry处于激活,新中枢方向为Down与Bucket相同,不做处理')
 
                                 # 2016-04-11
                                 # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
@@ -2393,18 +2473,45 @@ class One_Min_Hub_Container(Hub_Container):
 
                                 if last_hub.pos == 'Up':
 
+                                    print('One_Min_Hub_C.insertHub()--连续出现两次同向中枢--UP')
+
                                     if self.__bucket.isBucketAct() and self.__bucket.isSameTrending('Up'):
 
-                                        if self.__bucket.isEntryAct():
+                                        print('One_Min_Hub_C.insertHub()--Bucket处于激活状态,并且Bucket与新中枢同向--UP')
+
+                                        # 2016-04-26
+                                        # 买卖点跟随高级别中枢的而不跟随次级别中枢.在次级别连续出现同向中枢的情况下,原来已经设置了的买卖点不应该改变
+                                        # 在实际的情况里面是不会出现这种情况的,因为如果要形成一个同时中枢那么必然已经出现了低于或者高于买卖点的情况,这个时候交易已经触发
+                                        # TODO 目前的实现了中枢个数的限制,只有第二个同向中枢会激活买卖点和门限,随后出现的同向中枢不会再处理
+
+                                        if last_hub.ZD > self.__bucket.exist_price():
+
+                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围合理,UP, last_hub.ZD > bucket.exist_price:',
+                                                  last_hub.ZD, self.__bucket.exist_price())
+
+                                            # Entry没有被激活
+                                            if self.__bucket.isEntryAct() == False:
+
+                                                print('One_Min_Hub_C.insertHub()--没有Entry被激活,直接激活Entry为hub.ZD--',hub.ZG)
+
+                                                # 2016-04-23
+                                                # 如果次级别走势形成,触发Bucket买卖点状态,同时传递次级别中枢最高
+                                                self.__bucket.activeEntry(hub.ZG)
+
+                                            else:
+
+                                                print('One_Min_Hub_C.insertHub()--Entry已经被激活,不做处理')
 
                                         else:
 
-                                            # 2016-04-23
-                                            # 如果次级别走势形成,触发Bucket买卖点状态,同时传递次级别中枢最低
-                                            #TODO 目前的实现没有中枢个数的限制,只要是两个以上的同向中枢都会持续激活买卖点和门限
-                                            self.__bucket.activeEntry(hub.ZG)
+                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围不合理,UP, last_hub.ZD <= bucket.exist_price:',
+                                                  last_hub.ZD, self.__bucket.exist_price())
 
-                                        MACD_power()
+                                            counter.entry_failed_act += 1
+
+                                    else:
+
+                                        print('One_Min_Hub_C.insertHub()--次级别走势与Bucket反向,不做处理')
 
 
                         # 新中枢在向下的方向,则新中枢第一笔应该是向上笔
@@ -2424,9 +2531,17 @@ class One_Min_Hub_Container(Hub_Container):
                                 # 如果买卖点已经激活,但却出现了一个反向的中枢,这是去激活买卖点
                                 if self.__bucket.isBucketAct() and self.__bucket.isEntryAct():
 
+                                    print('One_Min_Hub_C.insertHub()--新中枢生成,Bucket处于激活并且Entry处于激活')
+
                                     if self.__bucket.isSameTrending('Up'):
 
+                                        print('One_Min_Hub_C.insertHub()--新中枢生成,Bucket处于激活并且Entry处于激活,新中枢方向为UP与Bucket相反,Entry去激活')
+
                                         self.__bucket.deactEntry()
+
+                                    else:
+
+                                        print('One_Min_Hub_C.insertHub()--新中枢生成,Bucket处于激活并且Entry处于激活,新中枢方向为UP与Bucket相同,不做处理')
 
                                 # 调用扩张检查
                                 e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
@@ -2452,19 +2567,39 @@ class One_Min_Hub_Container(Hub_Container):
                                 # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
                                 if last_hub.pos == 'Down':
 
+                                    print('One_Min_Hub_C.insertHub()--连续出现两次同向中枢--DOWN')
+
                                     # 2016-04-23
                                     # 如果次级别走势形成,触发Bucket买卖点状态,同时传递次级别中枢最低点
                                     if self.__bucket.isBucketAct() and self.__bucket.isSameTrending('Down'):
 
-                                        if self.__bucket.isEntryAct():
+                                        print('One_Min_Hub_C.insertHub()--Bucket处于激活状态,并且Bucket与新中枢同向--DOWN')
+
+                                        if last_hub.ZG < self.__bucket.exist_price():
+
+                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围合理,Down, last_hub.ZG < bucket.exist_price:',
+                                                  last_hub.ZG, self.__bucket.exist_price())
+
+                                            if self.__bucket.isEntryAct() == False:
+
+                                                print('One_Min_Hub_C.insertHub()--没有Entry被激活,直接激活Entry为hub.ZD--', hub.ZD)
+
+                                                self.__bucket.activeEntry(hub.ZD)
+
+                                            else:
+
+                                                print('One_Min_Hub_C.insertHub()--Entry已经被激活,不做处理')
 
                                         else:
 
-                                            self.__bucket.activeEntry(hub.ZD)
+                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围不合理,Down, last_hub.ZG >= bucket.exist_price:',
+                                                  last_hub.ZG, self.__bucket.exist_price())
 
-                                            # 处理MACD力量判断
-                                            # 同时也是检查买卖点的时机
-                                        MACD_power()
+                                            counter.entry_failed_act += 1
+
+                                    else:
+
+                                        print('One_Min_Hub_C.insertHub()--次级别走势与Bucket反向,不做处理')
 
                         # TODO: 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
                         # 前后两个中枢存在重叠区域,这种情况对中枢做合并
@@ -2481,11 +2616,6 @@ class One_Min_Hub_Container(Hub_Container):
                     # 返回 1的时候说明已经到了边界,没有继续遍历的需要
                     else:
                         break
-
-def MACD_power():
-
-   print()
-
 
 class Hour_Bucket():
 
@@ -2614,6 +2744,10 @@ class Ten_Min_Bucket():
 
         self.__exit_price = exit_price
 
+        print('Ten_Min_Bucket.activeBucket() -- exist_price:', exit_price)
+
+        counter.bucket_act += 1
+
     def __reset(self):
 
         self.hubs.reset()
@@ -2621,26 +2755,35 @@ class Ten_Min_Bucket():
         self.types.reset()
         self.candle_container.reset()
 
+        print('Ten_Min_Bucket.__reset()')
+
     def deactBucket(self):
 
-        self.__state = False
+        if self.__state:
 
-        self.__entry_price = 0
+            self.__state = False
+
+            print('Ten_Min_Bucket.deactBucket()')
+
+            counter.bucket_decat += 1
 
         self.deactEntry()
 
         self.__reset()
 
+    def exist_price(self):
+
+        return self.__exit_price
+
     # 2016-04-13
     # 以高级别的笔做为次级别数据的生成条件
     def loadCandleID(self, t):
 
-        print('Bucket代码调用--loadCandleID,高级别K线范围ID:', t)
-
         candle = self.__candles.container[t]
-
-        print('Bucket代码调用--loadCandleID, 高级别K线时间:', candle.getYear(), candle.getMonth(), candle.getDay(),
-              candle.getHour(), candle.getMins())
+        """
+        print('Ten_Min_Bucket.loadCandleID(),高级别K线时间:', candle.getYear(), candle.getMonth(), candle.getDay(),
+              candle.getHour(), candle.getMins(), 'ID:', t, '价格:', candle.getClose())
+        """
 
         self.candle_container.loadDB(candle.getYear(),
                                      candle.getMonth(),
@@ -2657,6 +2800,8 @@ class Ten_Min_Bucket():
     def setTrending(self, trend):
 
         self.__trend = trend
+
+        print('Ten_Min_Bucket.setTrending()--', trend)
 
     def isSameTrending(self, trend):
 
@@ -2679,47 +2824,69 @@ class Ten_Min_Bucket():
 
         self.__isEntry = True
 
+        print('Ten_Min_Bucket.activeEntry() -- entry:', entry_price)
+
+        counter.entry_act += 1
+
     def deactEntry(self):
 
-        self.__isEntry = False
+        if self.__isEntry:
 
-        self.__entry_price = 0
+            self.__isEntry = False
+
+            self.__entry_price = 0
+
+            print('Ten_Min_Bucket.deactEntry()')
+
+            counter.entry_decat += 1
 
     def isEntryAct(self):
 
         return self.__isEntry
 
-    def isExecutable(self, price):
+    def isExecutable(self, candle):
 
         if self.__isEntry and self.__state:
 
             # short
             if self.__trend == 'Up':
 
-                if price >= self.__entry_price:
+                if candle.getClose() > self.__entry_price:
+
+                    print('Ten_Min_Bucket.isExecutable(),做空!!!')
 
                     trader.exit = self.__exit_price
-                    trader.traded = price
+                    trader.traded = candle.getClose()
                     trader.stop = trader.stopping()
                     trader.isLong = False
+
+                    print('交易成交价格:', candle.getClose(), '止损价格:',trader.stop)
 
                     # 2016-04-24
                     # 一旦成功进行买卖操作,当前Bucket的状态数据应该全部清空.并且在当前买卖未完成的清空下,不应该再出现新的Buckect
                     self.froBucket()
+
+                    counter.short += 1
 
             # long
             else:
 
-                if price <= self.__entry_price:
+                if candle.getClose() < self.__entry_price:
+
+                    print('Ten_Min_Bucket.isExecutable(),做多!!!')
 
                     trader.exit = self.__exit_price
-                    trader.traded = price
+                    trader.traded = candle.getClose()
                     trader.stop = trader.stopping()
                     trader.isLong = True
+
+                    print('交易成交价格:', candle.getClose(), '止损价格:',trader.stop)
 
                     # 2016-04-24
                     # 一旦成功进行买卖操作,当前Bucket的状态数据应该全部清空.并且在当前买卖未完成的清空下,不应该再出现新的Buckect
                     self.froBucket()
+
+                    counter.long += 1
 
 
     def isFrozen(self):
@@ -2732,9 +2899,13 @@ class Ten_Min_Bucket():
 
         self.deactBucket()
 
+        print('Ten_Min_Bucket.froBucket() 交易执行,冻结Bucket')
+
     def deFroBucket(self):
 
         self.__isFrozen = False
+
+        print('Ten_Min_Bucket.deFroBucket() 解冻Bucket')
 
 class trader:
 
@@ -2761,40 +2932,203 @@ class trader:
     @staticmethod
     # 2016-04-24
     # 如果实际交易成功返回True
-    def isTrading(price):
+    def isTrading(candle):
 
         if trader.traded != -1:
 
             if trader.isLong:
 
-                if price > trader.exit:
+                if candle.getClose() > trader.exit:
 
-                    print('Long Profit Taken:', price - trader.traded)
+                    print('trader.isTrading() 执行做多')
 
-                elif price < trader.stop:
+                    print('获利价格:', candle.getClose(), '交易价格:', trader.traded)
+                    print('获利:', (candle.getClose()/trader.traded) - 1)
 
-                    print('Long Stop Lost:', price - trader.traded)
+                    counter.profile_taken_long += 1
+                    counter.earn_long += ((candle.getClose()/trader.traded) - 1)
+
+                    trader.traded = -1
+
+                    return True
+
+                elif candle.getClose() < trader.stop:
+
+                    print('trader.isTrading() 执行做多')
+
+                    print('止损价格:', candle.getClose(), '交易价格:', trader.traded)
+                    print('损失:', (candle.getClose()/trader.traded) - 1)
+
+                    counter.stop_lose_long += 1
+
+                    counter.lose_long += ((candle.getClose()/trader.traded) - 1)
+
+                    trader.traded = -1
+
+                    return True
 
             else:
 
-                if price < trader.exit:
+                if candle.getClose() < trader.exit:
 
-                    print('Short Profit Taken:', trader.traded - price)
+                    print('trader.isTrading() 执行做空')
 
-                elif price > trader.stop:
+                    print('获利价格:', candle.getClose(), '交易价格:', trader.traded)
+                    print('获利:', (trader.traded/candle.getClose()) - 1)
 
-                    print('Short Stop Lost:', trader.traded - price)
+                    counter.profile_taken_short += 1
+                    counter.earn_short += ((trader.traded/candle.getClose()) - 1)
 
-            trader.traded = -1
+                    trader.traded = -1
 
-            return True
+                    return True
+
+                elif candle.getClose() > trader.stop:
+
+                    print('trader.isTrading() 执行做空')
+
+                    print('止损价格:', candle.getClose(), '交易价格:', trader.traded)
+                    print('止损:', (trader.traded/candle.getClose()) - 1)
+
+                    counter.stop_lose_short += 1
+                    counter.lose_short += ((trader.traded/candle.getClose()) - 1)
+
+                    trader.traded = -1
+
+                    return True
 
         else:
 
             return False
 
 
-def test(year, month, count):
+class counter:
+
+    bucket_act = 0
+    bucket_decat = 0
+    bucket_sticky = 0
+
+    entry_act = 0
+    entry_decat = 0
+    entry_failed_act = 0
+
+    profile_taken_long = 0
+    profile_taken_short = 0
+
+    stop_lose_long = 0
+    stop_lose_short = 0
+
+    earn_long = 0
+    earn_short = 0
+    lose_long = 0
+    lose_short = 0
+
+    long = 0
+    short = 0
+
+    up_bucket_act = 0
+    up_bucket_break = 0
+    down_bucket_act = 0
+    down_bucket_break = 0
+
+    up_stick = 0
+    down_stick = 0
+
+    @staticmethod
+    def reset():
+
+        counter.bucket_act = 0
+        counter.bucket_decat = 0
+        counter.bucket_sticky = 0
+
+        counter.entry_act = 0
+        counter.entry_decat = 0
+        counter.entry_failed_act = 0
+
+        counter.profile_taken_long = 0
+        counter.profile_taken_short = 0
+
+        counter.stop_lose_long = 0
+        counter.stop_lose_short = 0
+
+        counter.earn_long = 0
+        counter.earn_short = 0
+        counter.lose_long = 0
+        counter.lose_short = 0
+
+        counter.long = 0
+        counter.short = 0
+
+        counter.up_bucket_act = 0
+        counter.up_bucket_break = 0
+        counter.down_bucket_act = 0
+        counter.down_bucket_break = 0
+
+        counter.up_stick = 0
+        counter.down_stick = 0
+
+    @staticmethod
+    def mycounter(m):
+        print('月份:', m)
+        print('趋势形成次数:', counter.bucket_act)
+        print('上行趋势形成次数:', counter.up_bucket_act)
+        print('下行趋势形成次数:', counter.down_bucket_act)
+        print('----------------------------------------')
+        print('趋势被破坏次数:', counter.bucket_decat)
+        print('上行趋势被破坏次数:', counter.up_bucket_break)
+        print('下行趋势被破坏次数:', counter.down_bucket_break)
+        print('----------------------------------------')
+        print('上行盘整粘滞次数:', counter.up_stick)
+        print('下行盘整粘滞次数:', counter.down_stick)
+        print('----------------------------------------')
+        print('Entry激活次数:', counter.entry_act)
+        print('Entry去激活次数:', counter.entry_decat)
+        print('Entry激活失败次数:', counter.entry_failed_act)
+        print('----------------------------------------')
+        print('做空次数:', counter.short)
+        print('做多次数:', counter.long)
+        print('----------------------------------------')
+        print('做空获利次数:', counter.profile_taken_short)
+        print('做空止损次数:', counter.stop_lose_short)
+        print('做空总收益:', counter.earn_short)
+        print('做空总损失:', counter.lose_short)
+        print('----------------------------------------')
+        print('做多获利次数:', counter.profile_taken_long)
+        print('做多止损次数:', counter.stop_lose_long)
+        print('做多总收益:', counter.earn_long)
+        print('做多总损失:', counter.lose_long)
+
+# MACD计算函数
+# 12日EMA的计算：EMA12 = 前一日EMA12 X 11/13 + 今日收盘 X 2/13
+# 26日EMA的计算：EMA26 = 前一日EMA26 X 25/27 + 今日收盘 X 2/27
+# 差离值（DIF）的计算： DIF = EMA12 - EMA26
+# 今日DEA = （前一日DEA X 8/10 + 今日DIF X 2/10）
+# MACD=(DIF-DEA）*2
+def init_MACD(stocks):
+
+    if len(stocks) == 1:
+
+        stocks[0]['EMA12'] = stocks[0]['Close']
+        stocks[0]['EMA26'] = stocks[0]['EMA12']
+        stocks[0]['DIF'] = stocks[0]['EMA12'] - stocks[0]['EMA26']
+        stocks[0]['DEA'] = 0
+        stocks[0]['MACD'] = (stocks[0]['DIF'] - stocks[0]['DEA']) * 2
+
+    else:
+        cur_stock = stocks[len(stocks) - 1]
+        pre_stock = stocks[len(stocks) - 2]
+
+        pre_EMA12 = pre_stock['EMA12']
+        pre_EMA26 = pre_stock['EMA26']
+        pre_DEA = pre_stock['DEA']
+
+        cur_stock['EMA12'] = pre_EMA12 * 11/13 + cur_stock['Close'] * 2/13
+        cur_stock['EMA26'] = pre_EMA26 * 25/27 + cur_stock['Close'] * 2/27
+        cur_stock['DIF'] = cur_stock['EMA12'] - cur_stock['EMA26']
+        cur_stock['DEA'] = pre_DEA * 8/10 + cur_stock['DIF'] * 2/10
+        cur_stock['MACD'] = (cur_stock['DIF'] - cur_stock['DEA']) * 2
+
+def test(year, month, count, skips = 0):
 
     candles = Ten_Min_Candle_Container()
 
@@ -2808,9 +3142,15 @@ def test(year, month, count):
 
     hubs = Ten_Min_Hub_Container(pens, b)
 
-    candles.loadDB(year, month, count, types, pens, hubs)
+    candles.loadDB(year, month, count, skips, types, pens, hubs)
 
     print(hubs.size())
+
+    Candle_Container.closeDB()
+
+    counter.mycounter(month)
+
+    counter.reset()
 
     ax_1 = plt.subplot(211)
 
@@ -2828,7 +3168,30 @@ def test(year, month, count):
 
     One_Min_Drawer.draw_hub(b.candle_container.container, b.hubs.container, ax_2)
 
+def test_year(year, m1, m2):
+
+    candles = Ten_Min_Candle_Container()
+
+    types = Type_Container(candles)
+
+    pens = Pen_Container(types)
+
+    b = Ten_Min_Bucket(candles)
+
+    candles.loadBucket(b)
+
+    hubs = Ten_Min_Hub_Container(pens, b)
+
+    for i in range(m1, m2+1):
+
+        candles.loadDB(year, i, 10000, 0, types, pens, hubs)
+
+        counter.mycounter(i)
+
+        counter.reset()
+
     Candle_Container.closeDB()
+
 
 class Ten_Min_Drawer:
 
