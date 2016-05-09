@@ -391,7 +391,6 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             hubs.insertHub()
 
-
     def dumpBucket(self):
 
         if self.__bucket.isBucketAct():
@@ -400,13 +399,40 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             self.__bucket.loadCandleID(i)
 
+        # 2016-05-09
+        # 测试代码
+        if Tran_Container.entry_index:
+
+            Tran_Container.actEntry(len(self.container) - 1)
+            Tran_Container.entry_index = False
+
     def trading(self, candle):
 
-        self.__bucket.isTradable(candle)
+        self.__bucket.tradingEntry(candle)
 
-        if trader.isTrading(candle):
+        # 2016-05-09
+        # 测试代码
+        if Tran_Container.trade_index:
+
+            Tran_Container.traded((len(self.container) - 1), candle.getClose())
+
+            Tran_Container.trade_index = False
+
+        if Trader.tradingExit(candle):
+
+            # 2016-05-09
+            # 测试代码
+            if Tran_Container.exit_index:
+
+                    Tran_Container.exitID(len(self.container) - 1)
 
             self.__bucket.deFroBucket()
+
+            # 2016-05-09
+            # 测试代码
+            Tran_Container.decatTran()
+
+
 
     def __del__(self):
 
@@ -1811,6 +1837,10 @@ class Hour_Hub_Container(Hub_Container):
                                     # Bucket牵扯到多次数据库的读取,控制必要的读取次数也就是优化效率
                                     self.__bucket.activeBucket()
 
+                                    # 2016-05-09
+                                    # 测试代码
+                                    Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
+
                                     print('中枢生成次级别数据加载笔坐标', self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
                                           self.pens.container[len(self.pens.container) - 1].endType.candle_index)
 
@@ -2080,9 +2110,16 @@ class Ten_Min_Hub_Container(Hub_Container):
 
                                             # 2016-04-26
                                             # 相邻的一个中枢没有附着Bucket
-                                            if last_hub.isSticky != True:
 
-                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢没有附着Bucket')
+                                            # 2016-05-08
+                                            # 一旦同向新中枢出现，但买卖点还没有形成的情况下，把原有Bucket去激活，然后更新到新的同向中枢中，后续的次级别等结构重新计算
+                                            # if last_hub.isSticky != True:
+
+                                            if self.__bucket.isEntryAct() == False:
+
+                                                # 2016-05-08
+                                                # print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢没有附着Bucket')
+                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,但买卖点没有形成')
 
                                                 self.__bucket.deactBucket()
 
@@ -2090,11 +2127,15 @@ class Ten_Min_Hub_Container(Hub_Container):
 
                                                 self.__bucket.activeBucket(hub.ZG)
 
+                                                # 2016-05-09
+                                                # 测试代码
+                                                Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
+
                                                 counter.up_bucket_act += 1
 
                                                 print('Ten_Min_Hub_Container.insertHub()--重新激活Bucket为ZG,Exit', hub.ZG)
 
-                                                hub.isSticky = True
+                                                #hub.isSticky = True
 
                                                 # 2016-05-04
                                                 # 这个实现虽然可以提前构造次级别点形态,但由于其他太多,可能出现在对历史次级别对构造过程中就触发了买卖点
@@ -2123,13 +2164,18 @@ class Ten_Min_Hub_Container(Hub_Container):
                                             # 2016-04-26
                                             # 如果上一个中枢有附着Bucket,同时本中枢又同向,这种情况又可能是盘整,要避免错杀盘整的情况
                                             # 不对Bucket做任何处理
+
+                                            # 2016-05-08
+                                            # 一旦同向新中枢出现，但买卖点已经形成，不做处理
                                             else:
 
-                                                hub.isSticky = False
+                                                # hub.isSticky = False
 
-                                                counter.up_stick += 1
+                                                # counter.up_stick += 1
 
-                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢附着Bucket,暂时不做处理,背驰可能出现在盘整')
+                                                # print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢附着Bucket,暂时不做处理,背驰可能出现在盘整')
+
+                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,买卖点已经形成,暂时不做处理')
 
                                         else:
 
@@ -2137,9 +2183,13 @@ class Ten_Min_Hub_Container(Hub_Container):
 
                                             self.__bucket.activeBucket(hub.ZG)
 
+                                            # 2016-05-09
+                                            # 测试代码
+                                            Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
+
                                             counter.up_bucket_act += 1
 
-                                            hub.isSticky = True
+                                            #hub.isSticky = True
 
                                             # 2016-04-23
                                             # 配置Bucket走势方向属性
@@ -2250,9 +2300,15 @@ class Ten_Min_Hub_Container(Hub_Container):
                                             # 2016-04-26
                                             # 相邻的一个中枢没有附着Bucket
                                             #
-                                            if last_hub.isSticky != True:
+                                            # 2016-05-08
 
-                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢没有附着Bucket')
+                                            #if last_hub.isSticky != True:
+
+                                            if self.__bucket.isEntryAct() == False:
+
+                                                # print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢没有附着Bucket')
+
+                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,但买卖点没有形成')
 
                                                 self.__bucket.deactBucket()
 
@@ -2260,11 +2316,15 @@ class Ten_Min_Hub_Container(Hub_Container):
 
                                                 self.__bucket.activeBucket(hub.ZD)
 
+                                                # 2016-05-09
+                                                # 测试代码
+                                                Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
+
                                                 counter.down_bucket_act += 1
 
                                                 print('Ten_Min_Hub_Container.insertHub()--重新激活Bucket,Exit为ZD', hub.ZD)
 
-                                                hub.isSticky = True
+                                                # hub.isSticky = True
 
                                                 # 2016-04-23
                                                 # 配置Bucket走势方向属性
@@ -2300,17 +2360,25 @@ class Ten_Min_Hub_Container(Hub_Container):
                                             # 2016-04-26
                                             # 如果上一个中枢有附着Bucket,同时本中枢又同向,这种情况又可能是盘整,要避免错杀盘整的情况
                                             # 不对Bucket做任何处理
+
+                                            # 2016-05-08
                                             else:
 
-                                                hub.isSticky = False
+                                                # hub.isSticky = False
 
-                                                counter.down_stick += 1
+                                                # counter.down_stick += 1
 
-                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢附着Bucket,暂时不做处理,背驰可能出现在盘整')
+                                                # print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢附着Bucket,暂时不做处理,背驰可能出现在盘整')
+
+                                                print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,买卖点已经形成,暂时不做处理,')
 
                                         else:
 
                                             self.__bucket.activeBucket(hub.ZD)
+
+                                            # 2016-05-09
+                                            # 测试代码
+                                            Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
 
                                             counter.down_bucket_act += 1
 
@@ -2318,7 +2386,7 @@ class Ten_Min_Hub_Container(Hub_Container):
 
                                             print('Ten_Min_Hub_Container.insertHub()--Bucket方向:Down')
 
-                                            hub.isSticky = True
+                                            # hub.isSticky = True
 
                                             # 2016-04-23
                                             # 配置Bucket走势方向属性
@@ -2573,10 +2641,14 @@ class One_Min_Hub_Container(Hub_Container):
                                         # 在实际的情况里面是不会出现这种情况的,因为如果要形成一个同时中枢那么必然已经出现了低于或者高于买卖点的情况,这个时候交易已经触发
                                         # TODO 目前的实现了中枢个数的限制,只有第二个同向中枢会激活买卖点和门限,随后出现的同向中枢不会再处理
 
-                                        if last_hub.ZD > self.__bucket.exist_price():
+                                        # 2016-05-08
+                                        # 次级别中枢和本级别中枢ZG／ZD关系判断买卖点关系可以放宽到只要次级别趋势的ZD比本级别中枢的ZG高就行，不需要控制到要求次级别的第一个中枢的ZD>本级别中枢的ZG
+                                        # if last_hub.ZD > self.__bucket.exist_price():
 
-                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围合理,UP, last_hub.ZD > bucket.exist_price:',
-                                                  last_hub.ZD, self.__bucket.exist_price())
+                                        if hub.ZD > self.__bucket.exist_price():
+
+                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围合理,UP, hub.ZD > bucket.exist_price:',
+                                                  hub.ZD, self.__bucket.exist_price())
 
                                             # Entry没有被激活
                                             if self.__bucket.isEntryAct() == False:
@@ -2596,8 +2668,8 @@ class One_Min_Hub_Container(Hub_Container):
 
                                         else:
 
-                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围不合理,UP, last_hub.ZD <= bucket.exist_price:',
-                                                  last_hub.ZD, self.__bucket.exist_price())
+                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围不合理,UP, hub.ZD <= bucket.exist_price:',
+                                                  hub.ZD, self.__bucket.exist_price())
 
                                             counter.entry_failed_act += 1
 
@@ -2663,10 +2735,14 @@ class One_Min_Hub_Container(Hub_Container):
 
                                         print('One_Min_Hub_C.insertHub()--Bucket处于激活状态,并且Bucket与新中枢同向--DOWN')
 
-                                        if last_hub.ZG < self.__bucket.exist_price():
+                                        # 2016-05-08
+                                        # 次级别中枢和本级别中枢ZG／ZD关系判断买卖点关系可以放宽到只要次级别趋势的ZD比本级别中枢的ZG高就行，不需要控制到要求次级别的第一个中枢的ZD>本级别中枢的ZG
+                                        # if last_hub.ZG < self.__bucket.exist_price():
 
-                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围合理,Down, last_hub.ZG < bucket.exist_price:',
-                                                  last_hub.ZG, self.__bucket.exist_price())
+                                        if hub.ZG < self.__bucket.exist_price():
+
+                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围合理,Down, hub.ZG < bucket.exist_price:',
+                                                  hub.ZG, self.__bucket.exist_price())
 
                                             if self.__bucket.isEntryAct() == False:
 
@@ -2682,8 +2758,8 @@ class One_Min_Hub_Container(Hub_Container):
 
                                         else:
 
-                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围不合理,Down, last_hub.ZG >= bucket.exist_price:',
-                                                  last_hub.ZG, self.__bucket.exist_price())
+                                            print('One_Min_Hub_C.insertHub()--次级别中枢范围不合理,Down, hub.ZG >= bucket.exist_price:',
+                                                  hub.ZG, self.__bucket.exist_price())
 
                                             counter.entry_failed_act += 1
 
@@ -2846,8 +2922,6 @@ class Ten_Min_Bucket():
 
         self.__exit_price = exit_price
 
-        # Power_MACD.init()
-
         print('Ten_Min_Bucket.activeBucket() -- exist_price:', exit_price)
 
         counter.bucket_act += 1
@@ -2935,6 +3009,10 @@ class Ten_Min_Bucket():
 
         counter.entry_act += 1
 
+        # 2016-05-09
+        # 测试代码
+        Tran_Container.entry_index = True
+
     def modEntry(self, new_price):
 
         self.__entry_price = new_price
@@ -2960,7 +3038,7 @@ class Ten_Min_Bucket():
 
         return self.__isEntry
 
-    def isTradable(self, candle):
+    def tradingEntry(self, candle):
 
         if self.__isEntry and self.__state:
 
@@ -2971,25 +3049,35 @@ class Ten_Min_Bucket():
 
                     if self.__power_MACD_exit.candles_MACD < self.__power_MACD_entry.candles_MACD:
 
-                        print('Ten_Min_Bucket.isTradable(),做空!!!')
+                        print('Ten_Min_Bucket.tradingEntry(),做空!!!')
 
-                        trader.exit = self.__exit_price
-                        trader.traded = candle.getClose()
-                        trader.stop = trader.stopping()
-                        trader.isLong = False
+                        Trader.exit = self.__exit_price
 
-                        print('Ten_Min_Bucket.isTradable() 交易成交价格:', candle.getClose(), '止损价格:', trader.stop)
-                        # print('Ten_Min_Bucket.isTradable() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
+                        Trader.traded = candle.getClose()
+                        Trader.stop = Trader.stopping()
+                        Trader.isLong = False
+
+                        print('Ten_Min_Bucket.tradingEntry() 交易成交价格:', candle.getClose(), '止损价格:', Trader.stop)
+                        print('Ten_Min_Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
 
                         # 2016-04-24
                         # 一旦成功进行买卖操作,当前Bucket的状态数据应该全部清空.并且在当前买卖未完成的清空下,不应该再出现新的Buckect
                         self.froBucket()
 
+                        # 2016-05-09
+                        # 测试代码
+                        Tran_Container.trade_index = True
+
                         counter.short += 1
 
                     else:
 
-                        print('Ten_Min_Bucket.isTradable() MACD力量对比失败, 去激活Bucket')
+                        print('Ten_Min_Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
+
+                        print('Ten_Min_Bucket.tradingEntry() MACD力量对比失败, 去激活Bucket')
+
+                        counter.up_MACD_break += 1
+
                         self.deactBucket()
 
             # long
@@ -2999,26 +3087,36 @@ class Ten_Min_Bucket():
 
                     if self.__power_MACD_exit.candles_MACD > self.__power_MACD_entry.candles_MACD:
 
-                        print('Ten_Min_Bucket.isTradable(),做多!!!')
+                        print('Ten_Min_Bucket.tradingEntry(),做多!!!')
 
-                        trader.exit = self.__exit_price
-                        trader.traded = candle.getClose()
-                        trader.stop = trader.stopping()
-                        trader.isLong = True
+                        Trader.exit = self.__exit_price
+                        Trader.traded = candle.getClose()
+                        Trader.stop = Trader.stopping()
+                        Trader.isLong = True
 
-                        print('Ten_Min_Bucket.isTradable() 交易成交价格:', candle.getClose(), '止损价格:', trader.stop)
-                        # print('Ten_Min_Bucket.isTradable() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
+                        print('Ten_Min_Bucket.tradingEntry() 交易成交价格:', candle.getClose(), '止损价格:', Trader.stop)
+                        print('Ten_Min_Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
 
                         # 2016-04-24
                         # 一旦成功进行买卖操作,当前Bucket的状态数据应该全部清空.并且在当前买卖未完成的清空下,不应该再出现新的Buckect
                         self.froBucket()
 
+                        # 2016-05-09
+                        # 测试代码
+                        Tran_Container.trade_index = True
+
                         counter.long += 1
 
-                    else:
+                else:
 
-                        print('Ten_Min_Bucket.isTradable() MACD力量对比失败, 去激活Bucket')
-                        self.deactBucket()
+                    print('Ten_Min_Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
+
+                    print('Ten_Min_Bucket.tradingEntry() MACD力量对比失败, 去激活Bucket')
+
+                    counter.down_MACD_break += 1
+
+                    self.deactBucket()
+
 
     def isFrozen(self):
 
@@ -3038,9 +3136,14 @@ class Ten_Min_Bucket():
 
         print('Ten_Min_Bucket.deFroBucket() 解冻Bucket')
 
-class trader:
+class Trader:
 
     # 成交位
+    # 此属性不仅仅是成交价位的记录,而且也是判断是否交易条件是否成熟的标示
+    # 如果此属性不为0,则说明当下处于交易运行过程中,正在等待获利了结或者止损离场的出现
+    # 如果为0,则说明没有处于交易运行的过程中
+    # 此属于由Bucket.isTradable()进行修改 0->非0
+    # 由trader.isTrading()在交易完成后修改 非0->0
     traded = -1
 
     # 获利了解位
@@ -3058,80 +3161,114 @@ class trader:
     # 止损位设定
     def stopping():
 
-        return 2 * trader.traded - trader.exit
+        return 2 * Trader.traded - Trader.exit
 
     @staticmethod
     # 2016-04-24
     # 如果实际交易成功返回True
-    def isTrading(candle):
+    def tradingExit(candle):
 
-        if trader.traded != -1:
+        if Trader.traded != -1:
 
-            if trader.isLong:
+            if Trader.isLong:
 
-                if candle.getClose() > trader.exit:
+                # 2016-05-08
+                # 关于成交点触发的时候不能仅关注Close()，同时要考虑Low and High
+                # 在做多趋势中,应该考虑High()
+                #if candle.getClose() > trader.exit:
 
-                    print('trader.isTrading() 执行做多')
+                if candle.getHigh() > Trader.exit:
 
-                    print('获利价格:', candle.getClose(), '交易价格:', trader.traded, '价格差:', candle.getClose() - trader.traded)
-                    print('获利:', (candle.getClose()/trader.traded) - 1)
+                    print('trader.tradingExit() 执行做多获利离场')
+
+                    print('获利价格:', candle.getHigh(), '交易价格:', Trader.traded, '价格差:', candle.getHigh() - Trader.traded)
+                    print('获利:', (candle.getHigh()/Trader.traded) - 1)
 
                     counter.profile_taken_long += 1
-                    counter.earn_long += ((candle.getClose()/trader.traded) - 1)
+                    counter.earn_long += ((candle.getHigh()/Trader.traded) - 1)
 
-                    trader.traded = -1
+                    Trader.traded = -1
+
+                    # 2016-05-09
+                    # 测试代码
+                    Tran_Container.exit_index = True
+                    Tran_Container.existPrice(candle.getHigh())
 
                     return True
 
-                elif candle.getClose() < trader.stop:
+                # 2016-05-08
+                # 关于成交点触发的时候不能仅关注Close()，同时要考虑Low and High
+                # 在做多止损中,应该考虑Low()
+                # elif candle.getClose() < trader.stop:
 
-                    print('trader.isTrading() 执行做多')
+                elif candle.getLow() < Trader.stop:
 
-                    print('止损价格:', candle.getClose(), '交易价格:', trader.traded, '损失:', trader.traded - candle.getClose())
-                    print('损失:', (candle.getClose()/trader.traded) - 1)
+                    print('trader.tradingExit() 执行做多止损离场')
+
+                    print('止损价格:', candle.getLow(), '交易价格:', Trader.traded, '损失:', Trader.traded - candle.getLow())
+                    print('损失:', (candle.getLow()/Trader.traded) - 1)
 
                     counter.stop_lose_long += 1
 
-                    counter.lose_long += ((candle.getClose()/trader.traded) - 1)
+                    counter.lose_long += ((candle.getLow()/Trader.traded) - 1)
 
-                    trader.traded = -1
+                    Trader.traded = -1
+
+                    # 2016-05-09
+                    # 测试代码
+                    Tran_Container.exit_index = True
+                    Tran_Container.existPrice(candle.getLow())
 
                     return True
 
             else:
 
-                if candle.getClose() < trader.exit:
+                # 2016-05-08
+                # if candle.getClose() < trader.exit:
 
-                    print('trader.isTrading() 执行做空')
+                if candle.getLow() < Trader.exit:
 
-                    print('获利价格:', candle.getClose(), '交易价格:', trader.traded, '获利:', trader.traded - candle.getClose())
-                    print('获利:', (trader.traded/candle.getClose()) - 1)
+                    print('trader.tradingExit() 执行做空获利离场')
+
+                    print('获利价格:', candle.getLow(), '交易价格:', Trader.traded, '获利:', Trader.traded - candle.getLow())
+                    print('获利:', (Trader.traded/candle.getLow()) - 1)
 
                     counter.profile_taken_short += 1
-                    counter.earn_short += ((trader.traded/candle.getClose()) - 1)
+                    counter.earn_short += ((Trader.traded/candle.getLow()) - 1)
 
-                    trader.traded = -1
+                    Trader.traded = -1
+
+                    # 2016-05-09
+                    # 测试代码
+                    Tran_Container.exit_index = True
+                    Tran_Container.existPrice(candle.getLow())
 
                     return True
 
-                elif candle.getClose() > trader.stop:
+                # 2016-05-08
+                # elif candle.getClose() > trader.stop:
+                elif candle.getHigh() > Trader.stop:
 
-                    print('trader.isTrading() 执行做空')
+                    print('trader.tradingExit() 执行做空止损离场')
 
-                    print('止损价格:', candle.getClose(), '交易价格:', trader.traded, '损失:', candle.getClose() - trader.traded)
-                    print('止损:', (trader.traded/candle.getClose()) - 1)
+                    print('止损价格:', candle.getHigh(), '交易价格:', Trader.traded, '损失:', candle.getHigh() - Trader.traded)
+                    print('止损:', (Trader.traded/candle.getHigh()) - 1)
 
                     counter.stop_lose_short += 1
-                    counter.lose_short += ((trader.traded/candle.getClose()) - 1)
+                    counter.lose_short += ((Trader.traded/candle.getHigh()) - 1)
 
-                    trader.traded = -1
+                    Trader.traded = -1
+
+                    # 2016-05-09
+                    # 测试代码
+                    Tran_Container.exit_index = True
+                    Tran_Container.existPrice(candle.getHigh())
 
                     return True
 
         else:
 
             return False
-
 
 class counter:
 
@@ -3164,6 +3301,9 @@ class counter:
 
     up_stick = 0
     down_stick = 0
+
+    up_MACD_break = 0
+    down_MACD_break = 0
 
     @staticmethod
     def reset():
@@ -3198,6 +3338,9 @@ class counter:
         counter.up_stick = 0
         counter.down_stick = 0
 
+        counter.up_MACD_break = 0
+        counter.down_MACD_break = 0
+
 
     @staticmethod
     def mycounter(m):
@@ -3229,8 +3372,8 @@ class counter:
         print('做多止损次数:', counter.stop_lose_long)
         print('做多总收益:', counter.earn_long)
         print('做多总损失:', counter.lose_long)
-
-
+        print('做多MACD破坏:',counter.down_MACD_break)
+        print('做空MACD破坏:',counter.up_MACD_break)
 
 
 # MACD计算函数
@@ -3335,6 +3478,7 @@ class Power_MACD_Entry(Power_MACD):
         # 结束K线位置
         e_candle_index = 0
 
+        """
         if last_hub.isSticky:
 
             pass
@@ -3344,6 +3488,7 @@ class Power_MACD_Entry(Power_MACD):
 
             last_hub = hub.container[hub.size() - 2]
             pre_hub = hub.container[hub.size() - 3]
+        """
 
         start_pen = last_hub.s_pen
         end_pen = pre_hub.e_pen
@@ -3351,7 +3496,11 @@ class Power_MACD_Entry(Power_MACD):
         # 中枢的方向不同会对获取第一个K线位置的判断有少许差别
         if last_hub.pos == 'Up':
 
+
             # 计算MACD阴影的起始K线位置
+            # 2016-05-08
+            # 起始位置从最后一笔的起点开始
+            """
             for i in range(end_pen.endType.candle_index, start_pen.beginType.candle_index + 1):
 
                 if self.candle_container.container[i].getHigh() >= pre_hub.ZG:
@@ -3360,6 +3509,9 @@ class Power_MACD_Entry(Power_MACD):
                     s_candle_index = i
 
                     break
+            """
+
+            s_candle_index = end_pen.beginType.candle_index
 
             # 计算MACD阴影的结束K线位
             for j in range(start_pen.beginType.candle_index, start_pen.endType.candle_index + 1):
@@ -3381,6 +3533,10 @@ class Power_MACD_Entry(Power_MACD):
         else:
 
             # 计算MACD阴影的起始K线位置
+
+            # 2016-05-08
+            # 起始位置从最后一笔的起点开始
+            """
             for i in range(end_pen.endType.candle_index, start_pen.beginType.candle_index + 1):
 
                 if self.candle_container.container[i].getLow() <= pre_hub.ZD:
@@ -3388,6 +3544,10 @@ class Power_MACD_Entry(Power_MACD):
                     s_candle_index = i
 
                     break
+            """
+
+            s_candle_index = end_pen.beginType.candle_index
+
 
             # 计算MACD阴影的结束K线位置
             for j in range(start_pen.beginType.candle_index, start_pen.endType.candle_index + 1):
@@ -3422,6 +3582,10 @@ class Power_MACD_Exit(Power_MACD):
         # 结束K线位置
         e_candle_index = 0
 
+        # 2016-05-08
+        # 取消了盘整的概念
+
+        """
         # 如果不是盘整中枢
         if last_hub.isSticky:
 
@@ -3431,6 +3595,7 @@ class Power_MACD_Exit(Power_MACD):
         else:
 
             last_hub = hub.container[hub.size() - 2]
+        """
 
         end_pen = last_hub.e_pen
 
@@ -3438,6 +3603,8 @@ class Power_MACD_Exit(Power_MACD):
         if last_hub.pos == 'Up':
 
             # 计算MACD阴影的起始K线位置
+            # 2016-05-08
+            """
             for i in range(end_pen.endType.candle_index, self.candle_container.size()):
 
                 if self.candle_container.container[i].getHigh() >= last_hub.ZG:
@@ -3446,6 +3613,9 @@ class Power_MACD_Exit(Power_MACD):
                     s_candle_index = i
 
                     break
+            """
+
+            s_candle_index = end_pen.beginType.candle_index
 
             # MACD阴影计算的结束K线就是当前最后的一根K线
             for t in range(s_candle_index, self.candle_container.size()):
@@ -3457,6 +3627,8 @@ class Power_MACD_Exit(Power_MACD):
         # 中枢朝下
         else:
 
+            # 2016-05-08
+            """
             for i in range(end_pen.endType.candle_index, self.candle_container.size()):
 
                 if self.candle_container.container[i].getLow() <= last_hub.ZD:
@@ -3464,6 +3636,8 @@ class Power_MACD_Exit(Power_MACD):
                     s_candle_index = i
 
                     break
+            """
+            s_candle_index = end_pen.beginType.candle_index
 
             # MACD阴影计算的结束K线就是当前最后的一根K线
             for t in range(s_candle_index, self.candle_container.size()):
@@ -3507,15 +3681,27 @@ def test(year, month, count, skips = 0):
 
     counter.reset()
 
-    ax_1 = plt.subplot(211)
+    print('Tran 长度:', len(Tran_Container.container))
 
-    ax_2 = plt.subplot(212)
 
-    Ten_Min_Drawer.draw_stocks(candles.container, types.container, ax_1, ax_2)
+    ax_1 = plt.subplot(2,1,2)
+
+    l = len(Tran_Container.container)
+
+    ax_a = []
+
+    for i in range(1, l+1):
+
+        ax_a.append(plt.subplot(2, l, i))
+
+    Ten_Min_Drawer.draw_stocks(candles.container, ax_1, ax_a)
 
     Ten_Min_Drawer.draw_pens(candles.container, pens.container, ax_1)
 
     Ten_Min_Drawer.draw_hub(candles.container, hubs.container, ax_1)
+
+    Tran_Container.reset()
+
 
     """
     One_Min_Drawer.draw_stocks(b.candle_container.container, b.types.container, ax_2)
@@ -3579,60 +3765,80 @@ class Ten_Min_Drawer:
 
     # 画K线算法.内部采用了双层遍历,算法简单,但性能一般
     @staticmethod
-    def draw_stocks(stocks, types, ax_1, ax_2):
-
-        c = 'b'
+    def draw_stocks(stocks, ax_1, ax_a):
 
         piexl_x = []
 
-        DIF = []
-        DEA = []
-        MACD = []
-
         height = []
         low = []
-        c = []
+        color = []
 
         for i in range(len(stocks)):
 
             piexl_x.append(i)
 
-
-            DIF.append(stocks[i].MACD.DIF)
-            DEA.append(stocks[i].MACD.DEA)
-            MACD.append(stocks[i].MACD.MACD)
-
-
             height.append(stocks[i].getHigh() - stocks[i].getLow())
             low.append(stocks[i].getLow())
 
-            j = 0
-            c.append('g')
+            """
+            b: blue -- Bucket
+            g: green -- Entry
+            r: red -- Exit
+            c: cyan
+            m: magenta
+            y: yellow
+            k: black
+            """
 
-            while j < len(types):
+            color.append('g')
 
-                if pd.Timestamp(pd.datetime(stocks[i].getYear(),
-                                            stocks[i].getMonth(),
-                                            stocks[i].getDay(),
-                                            stocks[i].getHour(),
-                                            stocks[i].getMins())) == \
-                        pd.datetime(types[j].candle.getYear(),
-                                    types[j].candle.getMonth(),
-                                    types[j].candle.getDay(),
-                                    types[j].candle.getHour(),
-                                    types[j].candle.getMins()):
+        ax_1.bar(piexl_x, height, 0.8, low, color = color)
 
-                    c[i] = 'r'
-                    break
+        Ten_Min_Drawer.draw_substocks(stocks, height, low, ax_a)
 
-                else:
-                    j += 1
+    @staticmethod
+    def draw_substocks(stocks, height, low, ax_a):
 
-        ax_1.bar(piexl_x, height, 0.8, low, color = c)
+        i = 0
 
-        ax_2.plot(piexl_x, DIF, color='#9999ff')
-        ax_2.plot(piexl_x, DEA, color='#ff9999')
-        ax_2.bar(piexl_x, MACD, 0.8, color='g')
+        while i < len(Tran_Container.container):
+
+            trendID = Tran_Container.container[i].trend
+            bucketID = Tran_Container.container[i].bucket
+            tradeID = Tran_Container.container[i].trade
+            exitID = Tran_Container.container[i].exit
+
+            sub_height = []
+            sub_low = []
+            c = []
+            sub_piexl = []
+
+            p = 0
+
+            for j in range(trendID, min((exitID + 100), len(stocks))):
+
+                sub_height.append(height[j])
+                sub_low.append(low[j])
+                c.append('g')
+                sub_piexl.append(p)
+                p += 1
+
+            c[bucketID-trendID] = 'r'
+            c[tradeID-trendID] = 'c'
+            c[exitID-trendID] = 'k'
+
+            ax_a[i].axis([trendID, exitID+100, -0.1, 1.1])
+
+            ax_a[i].bar(sub_piexl, sub_height, 0.8, sub_low, color = c)
+
+            sub_height.clear()
+            sub_low.clear()
+            c.clear()
+            sub_piexl.clear()
+
+            p = 0
+
+            i += 1
 
 
     @staticmethod
@@ -3724,27 +3930,81 @@ class Ten_Min_Drawer:
             #else:
 
             ax.add_patch(patches.Rectangle((x,y), w, h, color='y', fill=False))
-class Buyer:
 
-    def __init__(self):
+class Transcation:
 
-        print('')
+    def __init__(self, bucket_id, trend_id, price):
+
+        # Bucket 激活点Candle ID
+        self.bucket = bucket_id
+        self.trend = trend_id
+        self.exit_price = price
+
+    def entryID(self, id):
+
+        self.entry = id
+
+    def tradeID(self, id, price):
+
+        self.trade = id
+        self.trade_price = price
+
+    def exitID(self, id):
+
+        self.exit = id
+
+    def exitPrice(self, price):
+
+        self.exit_price = price
+
+class Tran_Container:
+
+    container = []
+    cur_tran = None
+
+    entry_index = False
+    trade_index = False
+    exit_index = False
 
     @staticmethod
-    def buy(self, price):
+    def actTran(id, trend_id, price):
 
-        print('buying:',price)
-
-class Seller:
-
-    def __init__(self):
-
-        print('')
+        Tran_Container.cur_tran = Transcation(id, trend_id, price)
 
     @staticmethod
-    def selling(self, price):
+    def actEntry(id):
 
-        print('selling:', price)
+        Tran_Container.cur_tran.entryID(id)
+
+    @staticmethod
+    def decatTran():
+
+        Tran_Container.cur_tran = None
+
+        Tran_Container.entry_index = False
+        Tran_Container.trade_index = False
+        Tran_Container.exit_index = False
+
+    @staticmethod
+    def traded(id, price):
+        Tran_Container.cur_tran.tradeID(id, price)
+
+    @staticmethod
+    def existPrice(price):
+        Tran_Container.cur_tran.exitPrice(price)
+
+    @staticmethod
+    def exitID(id):
+
+        Tran_Container.cur_tran.exitID(id)
+
+        Tran_Container.container.append(copy.deepcopy(Tran_Container.cur_tran))
+
+    @staticmethod
+    def reset():
+
+        Tran_Container.container = []
+        Tran_Container.decatTran()
 
 class One_Min_Drawer:
 
