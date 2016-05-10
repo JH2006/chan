@@ -374,7 +374,7 @@ class Ten_Min_Candle_Container(Candle_Container):
             # 在进行容器初始化加载历史数据的时候,同时对这部分数据进行包含处理
             self.contains()
 
-            print('-------Current Candle ID:', (len(self.container) - 1), '-----价格:', self.container[len(self.container) - 1].getClose())
+            # print('-------Current Candle ID:', (len(self.container) - 1), '-----价格:', self.container[len(self.container) - 1].getClose())
 
             self.insertMACD()
 
@@ -2959,7 +2959,7 @@ class Ten_Min_Bucket():
 
         candle = self.__candles.container[t]
 
-        print('Ten_Min_Bucket.loadCandleID()-- 高级别K线ID', t, '价格:', candle.getClose())
+        # print('Ten_Min_Bucket.loadCandleID()-- 高级别K线ID', t, '价格:', candle.getClose())
 
         self.candle_container.loadDB(candle.getYear(),
                                      candle.getMonth(),
@@ -3683,8 +3683,9 @@ def test(year, month, count, skips = 0):
 
     print('Tran 长度:', len(Tran_Container.container))
 
-
     ax_1 = plt.subplot(2,1,2)
+
+    ax_a = plt.subplot(2,1,1)
 
     l = len(Tran_Container.container)
 
@@ -3693,6 +3694,7 @@ def test(year, month, count, skips = 0):
     for i in range(1, l+1):
 
         ax_a.append(plt.subplot(2, l, i))
+
 
     Ten_Min_Drawer.draw_stocks(candles.container, ax_1, ax_a)
 
@@ -3818,16 +3820,24 @@ class Ten_Min_Drawer:
             for j in range(trendID, min((exitID + 100), len(stocks))):
 
                 sub_height.append(height[j])
+
                 sub_low.append(low[j])
-                c.append('g')
+
+                c.append('c')
                 sub_piexl.append(p)
+
                 p += 1
 
             c[bucketID-trendID] = 'r'
-            c[tradeID-trendID] = 'c'
-            c[exitID-trendID] = 'k'
-
-            ax_a[i].axis([trendID, exitID+100, -0.1, 1.1])
+            c[tradeID-trendID] = 'r'
+            c[exitID-trendID] = 'r'
+            print('-------------------------------------------------------')
+            print('大图趋势确认位置ID:', trendID)
+            print('小图Bucket确认激活位置ID:', bucketID-trendID, '(大图绝对位置ID:', bucketID, ')')
+            print('小图交易执行位置ID:', tradeID-trendID, '(大图绝对位置ID:', tradeID, ')')
+            print('交易价格:', Tran_Container.container[i].trade_price)
+            print('小图交易离场位置ID:', exitID-trendID, '(大图绝对位置ID:', exitID, ')')
+            print('离场价格:', Tran_Container.container[i].exit_price)
 
             ax_a[i].bar(sub_piexl, sub_height, 0.8, sub_low, color = c)
 
