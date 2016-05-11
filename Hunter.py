@@ -1837,7 +1837,7 @@ class Hour_Hub_Container(Hub_Container):
 
                                     # 2016-05-09
                                     # 测试代码
-                                    Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
+                                    Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZD)
 
                                     print('中枢生成次级别数据加载笔坐标', self.pens.container[t_cur_pen_index + 1].beginType.candle_index,
                                           self.pens.container[len(self.pens.container) - 1].endType.candle_index)
@@ -2316,7 +2316,7 @@ class Ten_Min_Hub_Container(Hub_Container):
 
                                                 # 2016-05-09
                                                 # 测试代码
-                                                Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
+                                                Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZD)
 
                                                 counter.down_bucket_act += 1
 
