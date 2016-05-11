@@ -374,7 +374,7 @@ class Ten_Min_Candle_Container(Candle_Container):
             # 在进行容器初始化加载历史数据的时候,同时对这部分数据进行包含处理
             self.contains()
 
-            # print('-------Current Candle ID:', (len(self.container) - 1), '-----价格:', self.container[len(self.container) - 1].getClose())
+            print('-------Current Candle ID:', (len(self.container) - 1), '-----价格:', self.container[len(self.container) - 1].getClose())
 
             self.insertMACD()
 
@@ -432,8 +432,6 @@ class Ten_Min_Candle_Container(Candle_Container):
             # 测试代码
             Tran_Container.decatTran()
 
-
-
     def __del__(self):
 
         Candle_Container.__del__(self)
@@ -489,7 +487,7 @@ class One_Min_Candle_Container(Candle_Container):
 
             pens.insertPen()
 
-            hubs.insertHub()
+            hubs.insertHub_2()
 
     def __del__(self):
 
@@ -2445,7 +2443,10 @@ class One_Min_Hub_Container(Hub_Container):
 
     # 2016-04-17
     # 当前调试阶段暂时把10min级别做为中间级别但不触发此级别加载和买卖点
-    def insertHub(self):
+
+    # 2016-05-11
+    # 接口命名bian
+    def insertHub_2(self):
 
         if self.last_hub_end_pen_index == 0:
 
@@ -2949,6 +2950,13 @@ class Ten_Min_Bucket():
 
         self.__reset()
 
+        # 2016-05-09
+        # 测试代码
+        # False说明还未生成交易,这类去激活是由于Bucket反向出现导致或者同向连续出现
+        if Tran_Container.trade_index == False:
+
+            Tran_Container.decatTran()
+
     def exist_price(self):
 
         return self.__exit_price
@@ -2959,7 +2967,7 @@ class Ten_Min_Bucket():
 
         candle = self.__candles.container[t]
 
-        # print('Ten_Min_Bucket.loadCandleID()-- 高级别K线ID', t, '价格:', candle.getClose())
+        print('Ten_Min_Bucket.loadCandleID()-- 高级别K线ID', t, '价格:', candle.getClose())
 
         self.candle_container.loadDB(candle.getYear(),
                                      candle.getMonth(),
@@ -3038,6 +3046,10 @@ class Ten_Min_Bucket():
 
         return self.__isEntry
 
+    # 2016-05-11
+    # 留意这里一直用的是收盘价进行比较
+    # 因为目前的实现是在本级别K线形成后才能加载次级别K线，次级别的K线相比本级别已经是历史数据，当买卖点被次级别形态所确认的时候
+    # 其实已经是历史数据，最早的交易也要等到一下本级别K线出现，所以当前K线的Close做为交易价格最接近实际情况
     def tradingEntry(self, candle):
 
         if self.__isEntry and self.__state:
@@ -3060,13 +3072,13 @@ class Ten_Min_Bucket():
                         print('Ten_Min_Bucket.tradingEntry() 交易成交价格:', candle.getClose(), '止损价格:', Trader.stop)
                         print('Ten_Min_Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
 
-                        # 2016-04-24
-                        # 一旦成功进行买卖操作,当前Bucket的状态数据应该全部清空.并且在当前买卖未完成的清空下,不应该再出现新的Buckect
-                        self.froBucket()
-
                         # 2016-05-09
                         # 测试代码
                         Tran_Container.trade_index = True
+
+                        # 2016-04-24
+                        # 一旦成功进行买卖操作,当前Bucket的状态数据应该全部清空.并且在当前买卖未完成的清空下,不应该再出现新的Buckect
+                        self.froBucket()
 
                         counter.short += 1
 
@@ -3096,6 +3108,10 @@ class Ten_Min_Bucket():
 
                         print('Ten_Min_Bucket.tradingEntry() 交易成交价格:', candle.getClose(), '止损价格:', Trader.stop)
                         print('Ten_Min_Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
+
+                        # 2016-05-09
+                        # 测试代码
+                        Tran_Container.trade_index = True
 
                         # 2016-04-24
                         # 一旦成功进行买卖操作,当前Bucket的状态数据应该全部清空.并且在当前买卖未完成的清空下,不应该再出现新的Buckect
@@ -3374,6 +3390,11 @@ class counter:
         print('做多总损失:', counter.lose_long)
         print('做多MACD破坏:',counter.down_MACD_break)
         print('做空MACD破坏:',counter.up_MACD_break)
+
+    @staticmethod
+    def writeExl():
+
+        df = pd.DataFrame({'Data': [10, 20, 30, 20, 15, 30, 45]})
 
 
 # MACD计算函数
@@ -3806,7 +3827,8 @@ class Ten_Min_Drawer:
         while i < len(Tran_Container.container):
 
             trendID = Tran_Container.container[i].trend
-            bucketID = Tran_Container.container[i].bucket
+            hubID = Tran_Container.container[i].hubID
+            entryID = Tran_Container.container[i].entry
             tradeID = Tran_Container.container[i].trade
             exitID = Tran_Container.container[i].exit
 
@@ -3828,15 +3850,17 @@ class Ten_Min_Drawer:
 
                 p += 1
 
-            c[bucketID-trendID] = 'r'
+            c[hubID-trendID] = 'r'
             c[tradeID-trendID] = 'r'
             c[exitID-trendID] = 'r'
             print('-------------------------------------------------------')
             print('大图趋势确认位置ID:', trendID)
-            print('小图Bucket确认激活位置ID:', bucketID-trendID, '(大图绝对位置ID:', bucketID, ')')
+            print('小图趋势确认中枢起点位置ID:', hubID-trendID, '(大图绝对位置ID:', hubID, ')')
+            print('小图Entry确认激活位置ID:', entryID-trendID, '(大图绝对位置ID:', entryID, ')')
             print('小图交易执行位置ID:', tradeID-trendID, '(大图绝对位置ID:', tradeID, ')')
-            print('交易价格:', Tran_Container.container[i].trade_price)
             print('小图交易离场位置ID:', exitID-trendID, '(大图绝对位置ID:', exitID, ')')
+            print('中枢边界价格:', Tran_Container.container[i].hub_price)
+            print('交易价格:', Tran_Container.container[i].trade_price)
             print('离场价格:', Tran_Container.container[i].exit_price)
 
             ax_a[i].bar(sub_piexl, sub_height, 0.8, sub_low, color = c)
@@ -3943,12 +3967,12 @@ class Ten_Min_Drawer:
 
 class Transcation:
 
-    def __init__(self, bucket_id, trend_id, price):
+    def __init__(self, hubId, trend_id, price):
 
-        # Bucket 激活点Candle ID
-        self.bucket = bucket_id
+        # 本中枢起点
+        self.hubID = hubId
         self.trend = trend_id
-        self.exit_price = price
+        self.hub_price = price
 
     def entryID(self, id):
 
