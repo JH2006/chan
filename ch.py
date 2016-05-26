@@ -76,16 +76,16 @@ def read_10Min(year, start, end):
 
     return data_1
 
-"""
+
 def dump_mongoDB():
 
     client = MongoClient()
 
     db = client.AUD_trading
 
-    coll = db.min_1
+    coll = db.GBP10m
 
-    e_1 = pd.read_csv('ccon5094@uni.sydney.edu.au-AUD1m-N114646626.csv')
+    e_1 = pd.read_csv('ccon5094@uni.sydney.edu.au-GBP10m-N118276385.csv')
 
     print('len:', len(e_1))
 
@@ -128,7 +128,7 @@ def dump_mongoDB():
     print(coll.count({}))
 
     client.close()
-"""
+
 
 # 处理包含函数
 # 每生成一次K线调用一次
@@ -1154,7 +1154,7 @@ def draw_stocks(stocks, ax_1, ax_2):
 
 
 # 测试调用接口
-def test(year=2001, start=2000, end=3000):
+def test_1(year=2001, start=2000, end=3000):
 
     stocks = read_10Min(year, start, end)
 
