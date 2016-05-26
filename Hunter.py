@@ -13,6 +13,51 @@ import math
 
 from pymongo import MongoClient
 
+from enum import Enum, unique
+
+import threading
+
+import queue
+
+import time
+
+@unique
+class Markets(Enum):
+
+    AUD = 'AUD'
+    GBP = 'GBP'
+    CAD = 'CAD'
+    CHF = 'CHF'
+    JPY = 'JPY'
+    EUR = 'EUR'
+
+    @staticmethod
+    def candelOfMarket(market):
+
+        candles = None
+
+        if Markets.AUD.value == market:
+            candles = AUD_Five_Min_Candle_Container()
+
+        elif Markets.CAD.value == market:
+            candles = CAD_Five_Min_Candle_Container()
+
+        elif Markets.CHF.value == market:
+            candles = CHF_Five_Min_Candle_Container()
+
+        elif Markets.EUR.value == market:
+            candles = EUR_Five_Min_Candle_Container()
+
+        elif Markets.GBP.value == market:
+            candles = GBP_Five_Min_Candle_Container()
+
+        elif Markets.JPY.value == market:
+            candles = JPY_Five_Min_Candle_Container()
+
+        else:
+            print('产品调用错误,程序退出!!!!!!')
+
+        return candles
 
 class Candle:
 
@@ -134,9 +179,9 @@ class Connector:
     @staticmethod
     def dump_mongoDB():
 
-        coll = Connector.mongodb.CBP5m
+        coll = Connector.mongodb.JPY1m
 
-        e_1 = pd.read_csv('ccon5094@uni.sydney.edu.au-GBP5m-N118277122.csv')
+        e_1 = pd.read_csv('ccon5094@uni.sydney.edu.au-JPY1m-N118276442.csv')
 
         print('len:', len(e_1))
 
@@ -352,10 +397,10 @@ class Candle_Container:
 
         # 2016-05-09
         # 测试代码
-        if Tran_Container.entry_index:
+        if self.__bucket._trans.entry_index:
 
-            Tran_Container.actEntry(len(self.container) - 1)
-            Tran_Container.entry_index = False
+            self.__bucket._trans.actEntry(len(self.container) - 1)
+            self.__bucket._trans.entry_index = False
 
     def trading(self, candle):
 
@@ -363,25 +408,25 @@ class Candle_Container:
 
         # 2016-05-09
         # 测试代码
-        if Tran_Container.trade_index:
+        if self.__bucket._trans.trade_index:
 
-            Tran_Container.traded((len(self.container) - 1), candle.getClose())
+            self.__bucket._trans.traded((len(self.container) - 1), candle.getClose())
 
-            Tran_Container.trade_index = False
+            self.__bucket._trans.trade_index = False
 
         if self.__bucket.tradingExit(candle):
 
             # 2016-05-09
             # 测试代码
-            if Tran_Container.exit_index:
+            if self.__bucket._trans.exit_index:
 
-                    Tran_Container.exitID(len(self.container) - 1)
+                    self.__bucket._trans.exitID(len(self.container) - 1)
+
+            self.__bucket._trans.decatTran()
 
             self.__bucket.deFroBucket()
 
-            # 2016-05-09
-            # 测试代码
-            Tran_Container.decatTran()
+
 
     def loadBucket(self, bucket):
 
@@ -714,15 +759,15 @@ class One_Min_Candle_Container(Candle_Container):
 
             self.container.append(m)
 
-            #print('One_Min_Candle_Container.loadCandleID() 次级别K线价格:', m.getClose())
+            print('One_Min_Candle_Container.loadCandleID() 次级别K线价格:', m.getClose())
 
-            """
+
             print('One_Min_Candle_Container.loadCandleID() -- 次级别K线时间', pd.Timestamp(pd.datetime(d['Year'],
                                                                                 d['Month'],
                                                                                 d['Day'],
                                                                                 d['Hour'],
                                                                                 d['Min_10']+d['Min_5']+d['Min_1'])).strftime('%Y-%m-%d %H:%M:%S'))
-            """
+
 
             # 在进行容器初始化加载历史数据的时候,同时对这部分数据进行包含处理
             self.contains()
@@ -3197,7 +3242,7 @@ class Five_Min_Hub_Container(Hub_Container):
 
                                                     # 2016-05-09
                                                     # 测试代码
-                                                    Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
+                                                    self.__bucket._trans.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
 
                                                     counter.up_bucket_act += 1
 
@@ -3253,7 +3298,7 @@ class Five_Min_Hub_Container(Hub_Container):
 
                                                 # 2016-05-09
                                                 # 测试代码
-                                                Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
+                                                self.__bucket._trans.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
 
                                                 counter.up_bucket_act += 1
 
@@ -3403,7 +3448,7 @@ class Five_Min_Hub_Container(Hub_Container):
 
                                                     # 2016-05-09
                                                     # 测试代码
-                                                    Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZD)
+                                                    self.__bucket._trans.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZD)
 
                                                     counter.down_bucket_act += 1
 
@@ -3463,7 +3508,7 @@ class Five_Min_Hub_Container(Hub_Container):
 
                                                 # 2016-05-09
                                                 # 测试代码
-                                                Tran_Container.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
+                                                self.__bucket._trans.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
 
                                                 counter.down_bucket_act += 1
 
@@ -3693,9 +3738,9 @@ class Bucket:
         # 2016-05-09
         # 测试代码
         # False说明还未生成交易,这类去激活是由于Bucket反向出现导致或者同向连续出现
-        if Tran_Container.trade_index == False:
+        if self._trans.trade_index == False:
 
-            Tran_Container.decatTran()
+            self._trans.decatTran()
 
     def exist_price(self):
 
@@ -3735,7 +3780,7 @@ class Bucket:
 
         self.__isEntry = True
 
-        print('Ten_Min_Bucket.activeEntry() -- entry:', entry_price)
+        print('Bucket.activeEntry() -- entry:', entry_price)
 
         # 从逻辑管理上,MACD的判断时机应该和买卖点的具体确定时间一致
         # 买卖点确定的时候就是MACD力量计算的时间点
@@ -3748,7 +3793,7 @@ class Bucket:
 
         # 2016-05-09
         # 测试代码
-        Tran_Container.entry_index = True
+        self._trans.entry_index = True
 
     def modEntry(self, new_price):
 
@@ -3764,7 +3809,7 @@ class Bucket:
 
             self.__entry_price = 0
 
-            print('Ten_Min_Bucket.deactEntry()')
+            print('Bucket.deactEntry()')
 
             counter.entry_decat += 1
 
@@ -3790,7 +3835,7 @@ class Bucket:
 
                     if self.__power_MACD_exit.candles_MACD < self.__power_MACD_entry.candles_MACD:
 
-                        print('Ten_Min_Bucket.tradingEntry(),做空!!!')
+                        print('Bucket.tradingEntry(),做空!!!')
 
                         self._trader.exit = self.__exit_price
 
@@ -3798,14 +3843,14 @@ class Bucket:
                         self._trader.stop = self._trader.stopping()
                         self._trader.isLong = False
 
-                        print('Ten_Min_Bucket.tradingEntry() 交易成交价格:', candle.getClose(), '止损价格:', self._trader.stop)
-                        print('Ten_Min_Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
+                        print('Bucket.tradingEntry() 交易成交价格:', candle.getClose(), '止损价格:', self._trader.stop)
+                        print('Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
 
                         # 2016-05-09
                         # 测试代码
-                        Tran_Container.trade_index = True
-                        Tran_Container.cur_tran.power(self.__power_MACD_exit.candles_MACD, self.__power_MACD_entry.candles_MACD)
-                        Tran_Container.cur_tran.execute('做空')
+                        self._trans.trade_index = True
+                        self._trans.cur_tran.power(self.__power_MACD_exit.candles_MACD, self.__power_MACD_entry.candles_MACD)
+                        self._trans.cur_tran.execute('做空')
 
                         # 2016-04-24
                         # 一旦成功进行买卖操作,当前Bucket的状态数据应该全部清空.并且在当前买卖未完成的清空下,不应该再出现新的Buckect
@@ -3815,9 +3860,9 @@ class Bucket:
 
                 else:
 
-                    print('Ten_Min_Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
+                    print('Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
 
-                    print('Ten_Min_Bucket.tradingEntry() MACD力量对比失败, 去激活Bucket')
+                    print('Bucket.tradingEntry() MACD力量对比失败, 去激活Bucket')
 
                     counter.up_MACD_break += 1
 
@@ -3831,21 +3876,21 @@ class Bucket:
 
                     if self.__power_MACD_exit.candles_MACD > self.__power_MACD_entry.candles_MACD:
 
-                        print('Ten_Min_Bucket.tradingEntry(),做多!!!')
+                        print('Bucket.tradingEntry(),做多!!!')
 
                         self._trader.exit = self.__exit_price
                         self._trader.traded = candle.getClose()
                         self._trader.stop = self._trader.stopping()
                         self._trader.isLong = True
 
-                        print('Ten_Min_Bucket.tradingEntry() 交易成交价格:', candle.getClose(), '止损价格:', self._trader.stop)
-                        print('Ten_Min_Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
+                        print('Bucket.tradingEntry() 交易成交价格:', candle.getClose(), '止损价格:', self._trader.stop)
+                        print('Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
 
                         # 2016-05-09
                         # 测试代码
-                        Tran_Container.trade_index = True
-                        Tran_Container.cur_tran.power(self.__power_MACD_exit.candles_MACD, self.__power_MACD_entry.candles_MACD)
-                        Tran_Container.cur_tran.execute('做多')
+                        self._trans.trade_index = True
+                        self._trans.cur_tran.power(self.__power_MACD_exit.candles_MACD, self.__power_MACD_entry.candles_MACD)
+                        self._trans.cur_tran.execute('做多')
 
                         # 2016-04-24
                         # 一旦成功进行买卖操作,当前Bucket的状态数据应该全部清空.并且在当前买卖未完成的清空下,不应该再出现新的Buckect
@@ -3856,9 +3901,9 @@ class Bucket:
 
                 else:
 
-                    print('Ten_Min_Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
+                    print('Bucket.tradingEntry() MACD力量对比 Entry VS Exit--:', self.__power_MACD_entry.candles_MACD, self.__power_MACD_exit.candles_MACD)
 
-                    print('Ten_Min_Bucket.tradingEntry() MACD力量对比失败, 去激活Bucket')
+                    print('Bucket.tradingEntry() MACD力量对比失败, 去激活Bucket')
 
                     counter.down_MACD_break += 1
 
@@ -3867,7 +3912,7 @@ class Bucket:
     # 2016-05-20
     def tradingExit(self, candle):
 
-        self._trader.tradingExit(candle)
+        return self._trader.tradingExit(candle, self._trans)
 
     def isFrozen(self):
 
@@ -3879,13 +3924,13 @@ class Bucket:
 
         self.deactBucket()
 
-        print('Ten_Min_Bucket.froBucket() 交易执行,冻结Bucket')
+        print('Bucket.froBucket() 交易执行,冻结Bucket')
 
     def deFroBucket(self):
 
         self.__isFrozen = False
 
-        print('Ten_Min_Bucket.deFroBucket() 解冻Bucket')
+        print('Bucket.deFroBucket() 解冻Bucket')
 
     # 任何额外需要初始化的代码放在这里
     def init(self):
@@ -3900,6 +3945,12 @@ class Bucket:
         # 考虑到目前Bucket管理了形态变化的各个关键状态,把MACD做为Bucket的一个属性设计也就符合逻辑了
         self.__power_MACD_entry = Power_MACD_Entry(self.__candles)
         self.__power_MACD_exit = Power_MACD_Exit(self.__candles)
+
+    # 2016-05-22
+    # 接口实现用于关联Tran_Container
+    def loadTrans(self, trans):
+
+        self._trans = trans
 
 class Ten_Min_Bucket(Bucket):
 
@@ -3978,7 +4029,8 @@ class Five_Min_Bucket(Bucket):
             self.candle_container = EUR_One_Min_Candle_Container()
 
         else:
-            self.candle_container = JPY_Five_Min_Candle_Container()
+
+            self.candle_container = JPY_One_Min_Candle_Container()
 
         self.init()
 
@@ -4044,7 +4096,7 @@ class Trader:
 
     # 2016-04-24
     # 如果实际交易成功返回True
-    def tradingExit(self, candle):
+    def tradingExit(self, candle, trans):
 
         if self.traded != -1:
 
@@ -4059,18 +4111,19 @@ class Trader:
 
                     print('trader.tradingExit() 执行做多获利离场')
 
-                    print('获利价格:', candle.getHigh(), '交易价格:', self.traded, '价格差:', candle.getHigh() - self.traded)
+                    print('获利价格:', candle.getHigh(), '交易价格:', self.traded)
                     print('获利:', (candle.getHigh()/self.traded) - 1)
 
                     counter.profile_taken_long += 1
                     counter.earn_long += ((candle.getHigh()/self.traded) - 1)
 
-                    self.traded = -1
-
                     # 2016-05-09
                     # 测试代码
-                    Tran_Container.exit_index = True
-                    Tran_Container.existPrice(candle.getHigh())
+                    trans.exit_index = True
+                    trans.existPrice(candle.getHigh())
+                    trans.profiting((candle.getHigh()/self.traded) - 1)
+
+                    self.traded = -1
 
                     return True
 
@@ -4083,19 +4136,20 @@ class Trader:
 
                     print('trader.tradingExit() 执行做多止损离场')
 
-                    print('止损价格:', candle.getLow(), '交易价格:', self.traded, '损失:', self.traded - candle.getLow())
+                    print('止损价格:', candle.getLow(), '交易价格:', self.traded)
                     print('损失:', (candle.getLow()/self.traded) - 1)
 
                     counter.stop_lose_long += 1
 
                     counter.lose_long += ((candle.getLow()/self.traded) - 1)
 
-                    self.traded = -1
-
                     # 2016-05-09
                     # 测试代码
-                    Tran_Container.exit_index = True
-                    Tran_Container.existPrice(candle.getLow())
+                    trans.exit_index = True
+                    trans.existPrice(candle.getLow())
+                    trans.profiting((candle.getLow()/self.traded) - 1)
+
+                    self.traded = -1
 
                     return True
 
@@ -4108,18 +4162,19 @@ class Trader:
 
                     print('trader.tradingExit() 执行做空获利离场')
 
-                    print('获利价格:', candle.getLow(), '交易价格:', self.traded, '获利:', self.traded - candle.getLow())
+                    print('获利价格:', candle.getLow(), '交易价格:', self.traded)
                     print('获利:', (self.traded/candle.getLow()) - 1)
 
                     counter.profile_taken_short += 1
                     counter.earn_short += ((self.traded/candle.getLow()) - 1)
 
-                    self.traded = -1
-
                     # 2016-05-09
                     # 测试代码
-                    Tran_Container.exit_index = True
-                    Tran_Container.existPrice(candle.getLow())
+                    trans.exit_index = True
+                    trans.existPrice(candle.getLow())
+                    trans.profiting((self.traded/candle.getLow()) - 1)
+
+                    self.traded = -1
 
                     return True
 
@@ -4129,18 +4184,21 @@ class Trader:
 
                     print('trader.tradingExit() 执行做空止损离场')
 
-                    print('止损价格:', candle.getHigh(), '交易价格:', self.traded, '损失:', candle.getHigh() - self.traded)
+                    print('止损价格:', candle.getHigh(), '交易价格:', self.traded)
                     print('止损:', (self.traded/candle.getHigh()) - 1)
 
                     counter.stop_lose_short += 1
                     counter.lose_short += ((self.traded/candle.getHigh()) - 1)
 
-                    self.traded = -1
-
                     # 2016-05-09
                     # 测试代码
-                    Tran_Container.exit_index = True
-                    Tran_Container.existPrice(candle.getHigh())
+                    trans.exit_index = True
+                    trans.existPrice(candle.getHigh())
+                    trans.profiting((self.traded/candle.getHigh()) - 1)
+
+                    self.traded = -1
+
+
 
                     return True
 
@@ -4534,31 +4592,36 @@ class Power_MACD_Exit(Power_MACD):
         self.loadMACD(hub)
 
 
-def test_month(year, month, count=0, skips = 0):
+def test_month(market, year, month, count=0, skips=0):
 
-    AUD_candles = AUD_Five_Min_Candle_Container()
+    candles = Markets.candelOfMarket(market)
 
-    AUD_types = Type_Container(AUD_candles)
+    types = Type_Container(candles)
 
-    AUD_pens = Pen_Container(AUD_types)
+    pens = Pen_Container(types)
 
-    AUD_bucket = Five_Min_Bucket(AUD_candles)
+    bucket = Five_Min_Bucket(candles)
 
-    AUD_hubs = Five_Min_Hub_Container(AUD_pens, AUD_bucket)
+    hubs = Five_Min_Hub_Container(pens, bucket)
 
-    AUD_bucket.loadHubs(AUD_hubs)
+    bucket.loadHubs(hubs)
 
-    AUD_candles.loadDB(year, month, count, skips, AUD_types, AUD_pens, AUD_hubs)
+    # 初始化Tran_Container对象
+    trans = Tran_Container()
 
-    print(AUD_hubs.size())
+    bucket.loadTrans(trans)
+
+    candles.loadDB(year, month, count, skips, types, pens, hubs)
+
+    print(hubs.size())
 
     counter.mycounter(month)
 
     counter.reset()
 
-    ax_1 = plt.subplot(2,1,2)
+    ax_1 = plt.subplot(2, 1, 2)
 
-    l = len(Tran_Container.container)
+    l = len(bucket._trans.container)
 
     ax_a = []
 
@@ -4567,51 +4630,59 @@ def test_month(year, month, count=0, skips = 0):
         ax_a.append(plt.subplot(2, l, i))
 
 
-    drawer = Five_Min_Drawer(AUD_candles.container)
+    drawer = Five_Min_Drawer(candles.container)
 
-    drawer.draw_stocks(AUD_candles.container, ax_1, ax_a)
+    drawer.draw_stocks(candles.container, ax_1, ax_a, trans)
 
-    drawer.draw_pens(AUD_pens.container, ax_1)
+    drawer.draw_pens(pens.container, ax_1)
 
-    drawer.draw_hub(AUD_hubs.container, AUD_hubs, ax_1)
+    drawer.draw_hub(hubs.container, hubs, ax_1)
 
-    Tran_Container.printing()
+    trans.printing()
 
-    Tran_Container.reset()
+    trans.reset()
 
-def test_year(year, m1, m2):
+def test_year(market, year, m1, m2):
 
-    AUD_candles = AUD_Five_Min_Candle_Container()
+    candles = Markets.candelOfMarket(market)
 
-    AUD_types = Type_Container(AUD_candles)
+    types = Type_Container(candles)
 
-    AUD_pens = Pen_Container(AUD_types)
+    pens = Pen_Container(types)
 
-    AUD_bucket = Five_Min_Bucket(AUD_candles)
+    bucket = Five_Min_Bucket(candles)
 
-    AUD_hubs = Five_Min_Hub_Container(AUD_pens, AUD_bucket)
+    hubs = Five_Min_Hub_Container(pens, bucket)
 
-    AUD_bucket.loadHubs(AUD_hubs)
+    bucket.loadHubs(hubs)
 
+    # 初始化Tran_Container对象
+    trans = Tran_Container()
+
+    bucket.loadTrans(trans)
+
+    # 逐月调用
     for i in range(m1, m2+1):
 
-        AUD_candles.loadDB(year, i, 0, 0, AUD_types, AUD_pens, AUD_hubs)
+        candles.loadDB(year, i, 0, 0, types, pens, hubs)
 
+        # 对每个月的结果做打印
         counter.mycounter(i)
 
         counter.reset()
 
-    d = copy.deepcopy(counter.record())
-
     counter.clean()
 
-    return d
+    # 统一打印一年的结果
+    trans.printing()
+
+    trans.reset()
 
 def test_years(year_1, year_2):
 
     for y in range(year_1, year_2+1):
 
-        test_year(y, 6, 9)
+        test_year(y, 1, 6)
 
         print(str(y), '年')
 
@@ -4861,7 +4932,7 @@ class Five_Min_Drawer:
 
     # 画K线算法.内部采用了双层遍历,算法简单,但性能一般
 
-    def draw_stocks(self, stocks, ax_1, ax_a):
+    def draw_stocks(self, candles, ax_1, ax_a, trans):
 
         piexl_x = []
 
@@ -4869,31 +4940,30 @@ class Five_Min_Drawer:
         low = []
         color = []
 
-        for i in range(len(stocks)):
+        for i, candle in enumerate(candles):
 
             piexl_x.append(i)
 
-            height.append(stocks[i].getHigh() - stocks[i].getLow())
-            low.append(stocks[i].getLow())
+            height.append(candle.getHigh() - candle.getLow())
+            low.append(candle.getLow())
 
             color.append('g')
 
         ax_1.bar(piexl_x, height, 0.8, low, color = color)
 
-        self.draw_substocks(stocks, height, low, ax_a)
+        self.draw_substocks(candle, height, low, ax_a, trans)
 
-
-    def draw_substocks(self, stocks, height, low, ax_a):
+    def draw_substocks(self, stocks, height, low, ax_a, trans):
 
         i = 0
 
-        while i < len(Tran_Container.container):
+        while i < len(trans.container):
 
-            trendID = Tran_Container.container[i].trend
-            hubID = Tran_Container.container[i].hubID
-            entryID = Tran_Container.container[i].entry
-            tradeID = Tran_Container.container[i].trade
-            exitID = Tran_Container.container[i].exit
+            trendID = trans.container[i].trend
+            hubID = trans.container[i].hubID
+            entryID = trans.container[i].entry
+            tradeID = trans.container[i].trade
+            exitID = trans.container[i].exit
 
             sub_height = []
             sub_low = []
@@ -4934,36 +5004,36 @@ class Five_Min_Drawer:
         piexl_x = []
         piexl_y = []
 
-        for j in range(len(pens)):
+        for _, pen in enumerate(pens):
 
             # 利用已经初始化的Date:Index字典,循环遍历pens数组以寻找其对于时间为关键值的X轴坐标位置
             # 添加起点
-            piexl_x.append(self.date_index[pd.Timestamp(pd.datetime(pens[j].beginType.candle.getYear(),
-                                                               pens[j].beginType.candle.getMonth(),
-                                                               pens[j].beginType.candle.getDay(),
-                                                               pens[j].beginType.candle.getHour(),
-                                                               pens[j].beginType.candle.get10Mins() +
-                                                                    pens[j].beginType.candle.get5Mins())).strftime('%Y-%m-%d %H:%M:%S')])
+            piexl_x.append(self.date_index[pd.Timestamp(pd.datetime(pen.beginType.candle.getYear(),
+                                                               pen.beginType.candle.getMonth(),
+                                                               pen.beginType.candle.getDay(),
+                                                               pen.beginType.candle.getHour(),
+                                                               pen.beginType.candle.get10Mins() +
+                                                                    pen.beginType.candle.get5Mins())).strftime('%Y-%m-%d %H:%M:%S')])
 
             # 添加终点
-            piexl_x.append(self.date_index[pd.Timestamp(pd.datetime(pens[j].endType.candle.getYear(),
-                                                               pens[j].endType.candle.getMonth(),
-                                                               pens[j].endType.candle.getDay(),
-                                                               pens[j].endType.candle.getHour(),
-                                                               pens[j].endType.candle.get10Mins() +
-                                                                    pens[j].endType.candle.get5Mins())).strftime('%Y-%m-%d %H:%M:%S')])
+            piexl_x.append(self.date_index[pd.Timestamp(pd.datetime(pen.endType.candle.getYear(),
+                                                               pen.endType.candle.getMonth(),
+                                                               pen.endType.candle.getDay(),
+                                                               pen.endType.candle.getHour(),
+                                                               pen.endType.candle.get10Mins() +
+                                                                    pen.endType.candle.get5Mins())).strftime('%Y-%m-%d %H:%M:%S')])
 
-            if pens[j].pos == 'Down':
+            if pen.pos == 'Down':
 
                 # 如果笔的朝向向下,那么画线的起点为顶分型的高点,终点为底分型的低点
-                piexl_y.append(pens[j].beginType.candle.getHigh())
-                piexl_y.append(pens[j].endType.candle.getLow())
+                piexl_y.append(pen.beginType.candle.getHigh())
+                piexl_y.append(pen.endType.candle.getLow())
 
             # 如果笔的朝向向上,那么画线的起点为底分型的低点,终点为顶分型的高点
             else:
 
-                piexl_y.append(pens[j].beginType.candle.getLow())
-                piexl_y.append(pens[j].endType.candle.getHigh())
+                piexl_y.append(pen.beginType.candle.getLow())
+                piexl_y.append(pen.endType.candle.getHigh())
 
         # 画线程序调用
         ax.plot(piexl_x, piexl_y, color='m')
@@ -4971,29 +5041,29 @@ class Five_Min_Drawer:
     # 画中枢
     def draw_hub(self, hubs, hub_container, ax):
 
-        for i in range(len(hubs)):
+        for _, hub in enumerate(hubs):
 
             # Rectangle x
 
-            start_date = pd.Timestamp(pd.datetime(hubs[i].s_pen.beginType.candle.getYear(),
-                                                      hubs[i].s_pen.beginType.candle.getMonth(),
-                                                      hubs[i].s_pen.beginType.candle.getDay(),
-                                                      hubs[i].s_pen.beginType.candle.getHour(),
-                                                      hubs[i].s_pen.beginType.candle.get10Mins()+
-                                                      hubs[i].s_pen.beginType.candle.get5Mins())).strftime('%Y-%m-%d %H:%M:%S')
+            start_date = pd.Timestamp(pd.datetime(hub.s_pen.beginType.candle.getYear(),
+                                                      hub.s_pen.beginType.candle.getMonth(),
+                                                      hub.s_pen.beginType.candle.getDay(),
+                                                      hub.s_pen.beginType.candle.getHour(),
+                                                      hub.s_pen.beginType.candle.get10Mins()+
+                                                      hub.s_pen.beginType.candle.get5Mins())).strftime('%Y-%m-%d %H:%M:%S')
 
             x = self.date_index[start_date]
 
             # Rectangle y
-            y = hubs[i].ZD
+            y = hub.ZD
 
             # Rectangle width
-            end_date = pd.Timestamp(pd.datetime(hubs[i].e_pen.endType.candle.getYear(),
-                                                    hubs[i].e_pen.endType.candle.getMonth(),
-                                                    hubs[i].e_pen.endType.candle.getDay(),
-                                                    hubs[i].e_pen.endType.candle.getHour(),
-                                                    hubs[i].e_pen.endType.candle.get10Mins()+
-                                                    hubs[i].e_pen.endType.candle.get5Mins())).strftime('%Y-%m-%d %H:%M:%S')
+            end_date = pd.Timestamp(pd.datetime(hub.e_pen.endType.candle.getYear(),
+                                                    hub.e_pen.endType.candle.getMonth(),
+                                                    hub.e_pen.endType.candle.getDay(),
+                                                    hub.e_pen.endType.candle.getHour(),
+                                                    hub.e_pen.endType.candle.get10Mins()+
+                                                    hub.e_pen.endType.candle.get5Mins())).strftime('%Y-%m-%d %H:%M:%S')
 
             end_index = self.date_index[end_date]
             start_index = self.date_index[start_date]
@@ -5001,9 +5071,9 @@ class Five_Min_Drawer:
             w = end_index - start_index
 
             # Rectangle height
-            h = hubs[i].ZG - hubs[i].ZD
+            h = hub.ZG - hub.ZD
 
-            if hub_container.isForTrade(hubs[i]):
+            if hub_container.isForTrade(hub):
 
                 c = 'y'
 
@@ -5030,6 +5100,9 @@ class Transcation:
         # hub.ZD
         self.hub_price = price
 
+        #收益/损失
+        self.profit = 0
+
     def entryID(self, id):
 
         self.entry = id
@@ -5052,80 +5125,87 @@ class Transcation:
 
         self.exit_price = price
 
+    def profiting(self, p):
+        self.profit = p
+
     def power(self, exit, entry):
 
         self.M_exit = exit
         self.M_entry = entry
 
+
+# 2016-05-22
+# 关于交易记录类对象化的思考
+# 交易类原则上重点是记录交易的价格信息,这类信息以Bucket最为集中.如果把交易类和Bucket关联,就可以实现对交易信息的管理.
+# 但考虑到目前还要在图形上辅助以分析,所以交易类还同时记录了K线信息对应的信息,比如ID,这就导致了交易类还要同时和中枢类以及Candle类进行互操作
+# 但这些和K线相关的信息最终不是系统的核心.考虑上述的因素,在对交易类进行对象化的时候还是采用把交易类和Bucket进行管理的方式,但同时交易类对象
+# 独立于Bucket存在
 class Tran_Container:
 
-    container = []
-    cur_tran = None
+    def __init__(self):
 
-    entry_index = False
-    trade_index = False
-    exit_index = False
+        self.container = []
+        self.cur_tran = None
 
-    @staticmethod
-    def actTran(id, trend_id, price):
+        self.entry_index = False
+        self.trade_index = False
+        self.exit_index = False
 
-        Tran_Container.cur_tran = Transcation(id, trend_id, price)
 
-    @staticmethod
-    def actEntry(id):
+    def actTran(self, id, trend_id, price):
 
-        Tran_Container.cur_tran.entryID(id)
+        self.cur_tran = Transcation(id, trend_id, price)
 
-    @staticmethod
-    def decatTran():
+    def actEntry(self, id):
 
-        Tran_Container.cur_tran = None
+        self.cur_tran.entryID(id)
 
-        Tran_Container.entry_index = False
-        Tran_Container.trade_index = False
-        Tran_Container.exit_index = False
+    def decatTran(self):
 
-    @staticmethod
-    def traded(id, price):
-        Tran_Container.cur_tran.tradeID(id, price)
+        self.cur_tran = None
 
-    @staticmethod
-    def execute(strategy):
+        self.entry_index = False
+        self.trade_index = False
+        self.exit_index = False
 
-        Tran_Container.cur_tran.execute(strategy)
+    def traded(self, id, price):
+        self.cur_tran.tradeID(id, price)
 
-    @staticmethod
-    def existPrice(price):
-        Tran_Container.cur_tran.exitPrice(price)
+    def execute(self, strategy):
 
-    @staticmethod
-    def exitID(id):
+        self.cur_tran.execute(strategy)
 
-        Tran_Container.cur_tran.exitID(id)
+    def existPrice(self, price):
+        self.cur_tran.exitPrice(price)
 
-        Tran_Container.container.append(copy.deepcopy(Tran_Container.cur_tran))
+    def profiting(self, p):
+        self.cur_tran.profiting(p)
 
-    @staticmethod
-    def reset():
+    def exitID(self, id):
 
-        Tran_Container.container.clear()
-        Tran_Container.decatTran()
+        self.cur_tran.exitID(id)
 
-    @staticmethod
-    def printing():
+        self.container.append(copy.deepcopy(self.cur_tran))
+
+    def reset(self):
+
+        self.container.clear()
+        self.decatTran()
+
+    def printing(self):
 
         i = 0
 
-        while i < len(Tran_Container.container):
+        while i < len(self.container):
 
-            trendID = Tran_Container.container[i].trend
-            hubID = Tran_Container.container[i].hubID
-            entryID = Tran_Container.container[i].entry
-            tradeID = Tran_Container.container[i].trade
-            exitID = Tran_Container.container[i].exit
+            trendID = self.container[i].trend
+            hubID = self.container[i].hubID
+            entryID = self.container[i].entry
+            tradeID = self.container[i].trade
+            exitID = self.container[i].exit
 
             print('-------------------------------------------------------')
-            print('第', i+1, '笔交易--', Tran_Container.container[i].strategy)
+            print('第', i+1, '笔交易--', self.container[i].strategy)
             print('大图:last_hub.s_pen.beginType.candle_index :', trendID)
             print('大图:hub.s_pen.beginType.candle_index:', hubID)
             print('小图:hub.s_pen.beginType.candle_index:', hubID-trendID, '(大图绝对位置ID:', hubID, ')')
@@ -5133,19 +5213,17 @@ class Tran_Container:
             print('小图:交易执行位置ID:', tradeID-trendID, '(大图绝对位置ID:', tradeID, ')')
             print('小图:交易离场位置ID:', exitID-trendID, '(大图绝对位置ID:', exitID, ')')
 
-            print('中枢边界价格:', Tran_Container.container[i].hub_price)
-            print('交易价格:', Tran_Container.container[i].trade_price)
-            print('离场价格:', Tran_Container.container[i].exit_price)
-            print('MACD Entry:', Tran_Container.container[i].M_entry)
-            print('MACD Exit:', Tran_Container.container[i].M_exit)
+            print('中枢边界价格:', self.container[i].hub_price)
+            print('交易价格:', self.container[i].trade_price)
+            print('离场价格:', self.container[i].exit_price)
+            print('获利:', self.container[i].profit)
+            print('MACD Entry:', self.container[i].M_entry)
+            print('MACD Exit:', self.container[i].M_exit)
 
             i += 1
 
-    @staticmethod
-    def save(file):
+    def save(self, month):
 
-        i = 0
-        writer = pd.ExcelWriter(file, engine='xlsxwriter')
 
         strategy = []
         hub_price = []
@@ -5153,37 +5231,30 @@ class Tran_Container:
         exit_price = []
         M_entry = []
         M_exit = []
+        months = []
+        profits = []
 
-        while i < len(Tran_Container.container):
+        for _, tran in enumerate(self.container):
 
-            strategy.append(Tran_Container.container[i].strategy)
-            hub_price.append(Tran_Container.container[i].hub_price)
-            trade_price.append(Tran_Container.container[i].trade_price)
-            exit_price.append(Tran_Container.container[i].exit_price)
-            M_entry.append(Tran_Container.container[i].M_entry)
-            M_exit.append(Tran_Container.container[i].M_exit)
-
-            i += 1
+            strategy.append(tran.strategy)
+            hub_price.append(tran.hub_price)
+            trade_price.append(tran.trade_price)
+            exit_price.append(tran.exit_price)
+            M_entry.append(tran.M_entry)
+            M_exit.append(tran.M_exit)
+            profits.append(tran.profit)
+            months.append(month)
 
         d = {'交易策略': strategy,
              '中枢边界价格': hub_price,
              '交易价格': trade_price,
              '离场价格': exit_price,
              'MACD Entry 力量': M_entry,
-             'MACD Exit 力量': M_exit}
+             'MACD Exit 力量': M_exit,
+             '获利': profits,
+             '月份': months}
 
-        df = pd.DataFrame(d)
-
-        df.to_excel(writer)
-
-        writer.close()
-
-        strategy.clear()
-        hub_price.clear()
-        trade_price.clear()
-        exit_price.clear()
-        M_entry.clear()
-        M_exit.clear()
+        return d
 
 
 class One_Min_Drawer:
@@ -5341,7 +5412,127 @@ class One_Min_Drawer:
 
             ax.add_patch(patches.Rectangle((x,y), w, h, color='y', fill=False))
 
+# 操作类继承了Python多线程管理.相当于每个月的操作都是一个独立线程
+# 目前的实现对每套线程都有自己完全独立的数据,暂时不会涉及到Lock的问题
+class Executor(threading.Thread):
 
-def close():
+    def __init__(self, market, year, month, transRecoder, lock, q):
 
-    plt.close()
+        threading.Thread.__init__(self)
+
+        self._market = market
+        self._year = year
+        self._month = month
+
+        self._candles = Markets.candelOfMarket(self._market)
+
+        self._types = Type_Container(self._candles)
+
+        self._pens = Pen_Container(self._types)
+
+        self._bucket = Five_Min_Bucket(self._candles)
+
+        self._hubs = Five_Min_Hub_Container(self._pens, self._bucket)
+
+        self._bucket.loadHubs(self._hubs)
+
+        self._trans = Tran_Container()
+
+        self._bucket.loadTrans(self._trans)
+
+        self._transRecorder = transRecoder
+
+        self._lock = lock
+
+        self._q = q
+
+    def run(self):
+
+        print('线程启动' + self.name)
+
+        self._candles.loadDB(self._year, self._month, 0, 0, self._types, self._pens, self._hubs)
+
+        self._candles.closeDB()
+
+        self._lock.acquire()
+
+        self._transRecorder[self._month] = self._trans
+
+        self._q.get()
+
+        self._lock.release()
+
+        print('线程结束' + self.name)
+
+    def __del__(self):
+
+        self._trans.reset()
+
+        self._hubs.reset()
+        self._pens.reset()
+        self._types.reset()
+        self._candles.reset()
+
+
+def test_markets(markets, years):
+
+    threads = []
+    transRecorder = {}
+    queueLocks = {}
+    workQueues = {}
+
+    for market in markets:
+
+        # threads[market] = []
+
+        transRecorder[market] = {}
+
+        queueLocks[market] = threading.Lock()
+
+        workQueues[market] = queue.Queue(12)
+
+    for year in years:
+
+        for market in markets:
+
+            for month in range(1, 13):
+
+                thread = Executor(market, year, month, transRecorder[market], queueLocks[market], workQueues[market])
+
+                thread.start()
+
+                workQueues[market].put(object())
+
+                threads.append(thread)
+
+        for thread in threads:
+
+            thread.join()
+
+        for market in markets:
+
+            while not workQueues[market].empty():
+
+                pass
+
+            fileName = str(year) + '年-' + market + '-市场' + '.xlsx'
+
+            writer = pd.ExcelWriter(fileName, engine='xlsxwriter')
+
+            for m in range(1, 13):
+
+                trans = transRecorder[market].get(m)
+
+                if not trans == None:
+
+                    d = trans.save(m)
+
+                    df = pd.DataFrame(d)
+
+                    df.to_excel(writer, 'sheet-' + str(m))
+
+                    trans.printing()
+
+                    trans.reset()
+
+            writer.close()
