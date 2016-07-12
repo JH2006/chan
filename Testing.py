@@ -96,16 +96,10 @@ def test_month_10(market, year, month, count=0, skips=0):
 
     pens = Hunter.Pen_Container(types)
 
-    bucket = Strategy.Ten_Min_Bucket(candles)
-
-    hubs = Hunter.Ten_Min_Hub_Container(pens, bucket)
-
-    bucket.loadHubs(hubs)
+    hubs = Hunter.Ten_Min_Hub_Container(pens)
 
     # 初始化Tran_Container对象
     trans = Hunter.Tran_Container()
-
-    bucket.loadTrans(trans)
 
     #s1 = S1.S1(candles.container,types.container,pens.container,hubs.container)
 
@@ -119,8 +113,6 @@ def test_month_10(market, year, month, count=0, skips=0):
     #S1.S2._trans.clear()
 
     ax_1 = plt.subplot(1, 1, 1)
-
-    l = len(bucket._trans.container)
 
     drawer = Drawer.Ten_Min_Drawer(candles.container)
 
@@ -156,16 +148,10 @@ def test_year(year, m1, m2):
 
     pens = Hunter.Pen_Container(types)
 
-    bucket = Strategy.Ten_Min_Bucket(candles)
-
-    hubs = Hunter.Ten_Min_Hub_Container(pens, bucket)
-
-    bucket.loadHubs(hubs)
+    hubs = Hunter.Ten_Min_Hub_Container(pens)
 
     # 初始化Tran_Container对象
     trans = Hunter.Tran_Container()
-
-    bucket.loadTrans(trans)
 
     #s1 = S1.S1(candles.container,types.container,pens.container,hubs.container)
 
@@ -204,16 +190,10 @@ def test_month_5(market, year, month, count=0, skips=0):
 
     pens = Hunter.Pen_Container(types)
 
-    bucket = Strategy.Five_Min_Bucket(candles)
-
-    hubs = Hunter.Five_Min_Hub_Container(pens, bucket)
-
-    bucket.loadHubs(hubs)
+    hubs = Hunter.Five_Min_Hub_Container(pens)
 
     # 初始化Tran_Container对象
     trans = Hunter.Tran_Container()
-
-    bucket.loadTrans(trans)
 
     s = S1.S(candles.container,types.container,pens.container,hubs.container)
 
@@ -255,7 +235,7 @@ def test_years(market, year_1, year_2):
 
 if __name__ == '__main__':
 
-    test_month_10('', 2005, 1)
+    test_month_10('', 2005, 2)
 
     #for i in range(2005, 2006):
     #    test_year(i, 1, 12)

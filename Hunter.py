@@ -159,7 +159,9 @@ class Connector:
 
         self.client.close()
 
-
+"""
+Candle_Container
+"""
 class Candle_Container:
     def __init__(self):
 
@@ -318,45 +320,6 @@ class Candle_Container:
 
         self.container.append(candle)
 
-    def dumpBucket(self):
-
-        if self.__bucket.isBucketAct():
-            i = len(self.container) - 1
-
-            self.__bucket.loadCandleID(i)
-
-        # 2016-05-09
-        # 测试代码
-        if self.__bucket._trans.entry_index:
-            self.__bucket._trans.actEntry(len(self.container) - 1)
-            self.__bucket._trans.entry_index = False
-
-    def trading(self, candle):
-
-        self.__bucket.tradingEntry(candle)
-
-        # 2016-05-09
-        # 测试代码
-        if self.__bucket._trans.trade_index:
-            self.__bucket._trans.traded((len(self.container) - 1), candle.getClose())
-
-            self.__bucket._trans.trade_index = False
-
-        if self.__bucket.tradingExit(candle):
-
-            # 2016-05-09
-            # 测试代码
-            if self.__bucket._trans.exit_index:
-                self.__bucket._trans.exitID(len(self.container) - 1)
-
-            self.__bucket._trans.decatTran()
-
-            self.__bucket.deFroBucket()
-
-    def loadBucket(self, bucket):
-
-        self.__bucket = bucket
-
     def closeDB(self):
 
         self._c.closeDB()
@@ -473,13 +436,6 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             self.insertMACD()
 
-            # 2016-04-19
-            # 一旦Bucket确认激活,最好地跟踪次级别的方式是一旦K线形成并处理完包含,马上进行次级别数据读取
-            # 因为如果等待笔形成后再读取,由于笔的可变性,很容易出现漏读的情况
-            # self.dumpBucket()
-
-            # self.trading(m)
-
             types.insertType(m)
 
             pens.insertPen()
@@ -576,10 +532,6 @@ class Five_Min_Candle_Container(Candle_Container):
 
             self.insertMACD()
 
-            # self.dumpBucket()
-
-            # self.trading(m)
-
             types.insertType(m)
 
             pens.insertPen()
@@ -590,7 +542,6 @@ class Five_Min_Candle_Container(Candle_Container):
     def __del__(self):
 
         Candle_Container.__del__(self)
-
 
 # 抽象类
 class One_Min_Candle_Container(Candle_Container):
@@ -1349,13 +1300,11 @@ class Hub:
 
 
 class Hub_Container:
-    def __init__(self, pens, bucket):
+    def __init__(self, pens):
 
         self.pens = pens
 
         self.container = []
-
-        self._bucket = bucket
 
         # 常量确定中枢的宽度
         self.hub_width = 3
@@ -1458,9 +1407,6 @@ class Hub_Container:
         # 已经存在中枢,则可能出现两种情况:
         # 1. 已知的最后一个中枢继续生长
         # 2. 已知的最后一个中枢无法生长,但新出现的笔可能构成新的中枢
-
-        # TODO: 2016-05-06: 虽然交易完成,Bucket解除交易锁定状态,但此时的中枢延伸部分将不会再进行任何的交易,如果中枢延伸很远,那是否会错失交易机会?
-        # 会存在这样的可能,只是这个过程都属于中枢部分,次级别构成趋势形成买卖点的概率不应该很高
         else:
 
             # 尝试扩张最后一个中枢,调用延伸函数
@@ -1495,9 +1441,6 @@ class Hub_Container:
 
                 # 从离最后一个中枢最近的不属于任何中枢的笔开始遍历
                 cur_pen_index = self.last_hub_end_pen_index + 1
-
-                # 2016-04-19
-                # 一旦Bucket确认激活,则转由Candle Container来完成后续的K线次级别读取
 
                 # 2016-04-11
                 # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
@@ -1552,38 +1495,6 @@ class Hub_Container:
                                 # 新中枢新的位置属性
                                 hub.pos = 'Up'
 
-                                # 2016-06-20
-                                # 屏蔽Bucket操作代码
-                                """
-                                # 如果Bucket处于激活状态,请首先去激活并复位
-                                # 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
-
-                                # 2016-04-17
-                                # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,
-                                # 都说明了当前处于激活状态的Bucket已经没有意义
-                                if self._bucket.isBucketAct():
-
-                                    if __debug__:
-
-                                        print('Hub_Container.insertHub()--新中枢生成,Bucket处于激活状态, 方向--UP')
-
-                                    # 2016-04-23
-                                    # 只有在新的中枢是反向中枢的时候才去激活,延迟了去激活时间
-                                    # 目的: 背驰段可能出现在本级别的盘整中枢延伸的过程中
-                                    if self._bucket.isSameTrending('Down'):
-
-                                        if __debug__:
-
-                                            print('Hub_Container.insertHub()--新中枢和Bucket方向相反,Bucket去激活')
-
-                                        self._bucket.deactBucket()
-
-                                    else:
-                                        if __debug__:
-
-                                            print('Hub_Container.insertHub()--新中枢和Bucket方向相同,不处理')
-                                """
-
                                 # 2016-04-11
                                 # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
                                 # 被断定为中枢扩展的次级别数据可以存储到本中枢中为次级别走势判断服务
@@ -1611,143 +1522,6 @@ class Hub_Container:
 
                                 self.container.append(hub)
 
-                                # 2016-06-20
-                                # 屏蔽Bucket操作代码
-
-                                """
-                                # 出现两次同向中枢
-                                # 2016-04-11
-                                # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
-                                # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
-
-                                if last_hub.pos == 'Up':
-
-                                    print('Hub_Container.insertHub()--连续出现两次同向中枢--UP')
-
-                                    # 2016-05-19
-                                    # 加入中枢范围合理性检查
-                                    # 只有当前一个中枢具有5笔以上9笔以下范围时才对本级别中枢操作
-                                    # 注意:当前的中枢范围判断是围绕上一中枢开展,这是因为本级别中枢属于当下操作,当前的状态不能代表终结态
-                                    if self.isForTrade(last_hub):
-
-                                        print('Hub_Container.insertHub()--上一中枢范围合理,实行Bucket处理--',
-                                              last_hub.e_pen_index - last_hub.s_pen_index + 1)
-
-                                        # 2016-04-17
-                                        # 只有在本级别中枢最后确认为趋势形成的时候才激活Bucket
-                                        # Bucket牵扯到多次数据库的读取,控制必要的读取次数也就是优化效率
-
-                                        # 2016-04-24
-                                        # 只有在Bucket非终结状态的时候才能激活
-                                        # 目前的考虑是在处于交易状态的时候不允许更新任何Bucket相关的状态,直到此次交易结束
-                                        # 好处是让同一时间仅有一个交易过程,直到Exit或者Stop出现,整个交易过程易于管理
-                                        # 可能出现的缺点是如果市场一直在Exit和Stop之间的区间不断波动,那么程序就处于不交易状态,当然如果Exit和Stop
-                                        # 的差合理,这样的波动本质上就是中枢的构造过程,不应该操作.
-                                        # 所以Exit和Stop的设定很重要
-                                        # TODO 2016-04-26 关于交易保存激活的时候是否可以继续做Bucket更新的思考
-                                        if not self._bucket.isFrozen():
-
-                                            print('Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于非交易状态')
-
-                                            if self._bucket.isBucketAct():
-
-                                                print('Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态')
-
-                                                # 2016-04-26
-                                                # 相邻的一个中枢没有附着Bucket
-
-                                                # 2016-05-08
-                                                # 一旦同向新中枢出现，但买卖点还没有形成的情况下，把原有Bucket去激活，然后更新到新的同向中枢中，后续的次级别等结构重新计算
-                                                # if last_hub.isSticky != True:
-
-                                                if not self._bucket.isEntryAct():
-
-                                                    # 2016-05-08
-                                                    # print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢没有附着Bucket')
-                                                    print('Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,但买卖点没有形成')
-
-                                                    self._bucket.deactBucket()
-
-                                                    print('Hub_Container.insertHub()--去激活Bucket')
-
-                                                    self._bucket.activeBucket(hub.ZG)
-
-                                                    # 2016-05-09
-                                                    # 测试代码
-                                                    self._bucket._trans.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
-
-                                                    print('Hub_Container.insertHub()--重新激活Bucket为ZG,Exit', hub.ZG)
-
-                                                    #hub.isSticky = True
-
-                                                    # 2016-05-04
-                                                    # 这个实现虽然可以提前构造次级别点形态,但由于其他太多,可能出现在对历史次级别对构造过程中就触发了买卖点
-                                                    # 这是不合理的!!! 买卖点只能发生在未来而不是过去的数据
-                                                    # 但为了给次级别实现部分的提前加载,可以从当前中枢已识别出来的最后一笔开始加载,而非中枢的起始笔
-                                                    print('Hub_Container.insertHub()--中枢生成次级别数据加载笔范围',
-                                                          self.pens.container[len(self.pens.container) - 1].beginType.candle_index,
-                                                          self.pens.container[len(self.pens.container) - 1].endType.candle_index)
-
-                                                    for t in range(self.pens.container[len(self.pens.container) - 1].beginType.candle_index,
-                                                                   self.pens.container[len(self.pens.container) - 1].endType.candle_index):
-
-                                                        self._bucket.loadCandleID(t)
-
-                                                # 2016-04-26
-                                                # 如果上一个中枢有附着Bucket,同时本中枢又同向,这种情况又可能是盘整,要避免错杀盘整的情况
-                                                # 不对Bucket做任何处理
-
-                                                # 2016-05-08
-                                                # 一旦同向新中枢出现，但买卖点已经形成，不做处理
-                                                else:
-
-                                                    # hub.isSticky = False
-
-                                                    # print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢附着Bucket,暂时不做处理,背驰可能出现在盘整')
-
-                                                    print('Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,买卖点已经形成,暂时不做处理')
-
-                                            else:
-
-                                                print('Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于非激活状态,直接激活Bucket')
-
-                                                self._bucket.activeBucket(hub.ZG)
-
-                                                # 2016-05-09
-                                                # 测试代码
-                                                self._bucket._trans.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZG)
-
-                                                #hub.isSticky = True
-
-                                                # 2016-04-23
-                                                # 配置Bucket走势方向属性
-                                                self._bucket.setTrending('Up')
-
-                                                print('Hub_Container.insertHub()--Bucket方向:UP')
-
-                                                # 2016-05-04
-                                                # 这个实现虽然可以提前构造次级别点形态,但由于其他太多,可能出现在对历史次级别对构造过程中就触发了买卖点
-                                                # 这是不合理的!!! 买卖点只能发生在未来而不是过去的数据
-                                                # 但为了给次级别实现部分的提前加载,可以从当前中枢已识别出来的最后一笔开始加载,而非中枢的起始笔
-                                                print('Hub_Container.insertHub()--中枢生成次级别数据加载笔范围',
-                                                      self.pens.container[len(self.pens.container) - 1].beginType.candle_index,
-                                                      self.pens.container[len(self.pens.container) - 1].endType.candle_index)
-
-                                                for t in range(self.pens.container[len(self.pens.container) - 1].beginType.candle_index,
-                                                               self.pens.container[len(self.pens.container) - 1].endType.candle_index):
-
-                                                    self._bucket.loadCandleID(t)
-
-                                        else:
-
-                                            print('Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于交易状态,不做任何处理')
-
-                                    else:
-
-                                        print('Hub_Container.insertHub()--上一中枢范围不合理,不做任何本级别交易处理')
-
-                                """
-
                                 return 1
 
                         # 新中枢在向下的方向,则新中枢第一笔应该是向上笔
@@ -1762,33 +1536,6 @@ class Hub_Container:
 
                                 # 新中枢新的位置属性
                                 hub.pos = 'Down'
-
-                                # 2016-06-20
-                                # 屏蔽Bucket操作代码
-
-                                """
-                                # 如果Bucket处于激活状态,请首先去激活并复位
-                                # 但还没有重新激活Bucket,等到本级别确认趋势形成才开始激活
-
-                                # 2016-04-17
-                                # 如果Bucket处于激活状态,请首先去激活并复位,因为如果本级别能够形成一个新的中枢,无论它是哪个方向,都说明了当前处于激活状态的Bucket已经没有意义
-                                if self._bucket.isBucketAct():
-
-                                    print('Hub_Container.insertHub()--新中枢生成,Bucket处于激活状态,方向--Down')
-
-                                    # 2016-04-23
-                                    # 只有在新的中枢是反向中枢的时候才去激活,延迟了去激活时间
-                                    # 目的: 背驰段可能出现在本级别的盘整中枢延伸的过程中
-                                    if self._bucket.isSameTrending('Up'):
-
-                                        print('Hub_Container.insertHub()--新中枢和Bucket方向相反,Bucket去激活 ')
-
-                                        self._bucket.deactBucket()
-
-                                    else:
-
-                                        print('Hub_Container.insertHub()--新中枢和Bucket方向相同,不处理')
-                                """
 
                                 # 调用扩张检查
                                 e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
@@ -1813,133 +1560,6 @@ class Hub_Container:
                                     self.last_hub_end_pen_index = cur_pen_index - 1
 
                                 self.container.append(hub)
-
-                                # 2016-06-20
-                                # 屏蔽Bucket操作代码
-
-                                """
-                                # 2016-04-11
-                                # 根据当前所采用的中枢延迟判决的机制,当能够确认一个新中枢形成的时候,至少已经在最小满足中枢笔数量的基础上再多往前
-                                # 生成了3笔.这个时候对于新中枢应该考虑加载第5笔以及以后笔的次级别信息
-                                if last_hub.pos == 'Down':
-
-                                    print('Hub_Container.insertHub()--连续出现两次同向中枢--DOWN')
-
-                                    # 2016-05-17
-                                    if self.isForTrade(last_hub):
-
-                                        print('Hub_Container.insertHub()--上一中枢范围合理,实行Bucket处理',
-                                              last_hub.e_pen_index - last_hub.s_pen_index + 1)
-
-                                        # 可以把中枢的第一笔开始均加入Bucket,虽然此若干笔的次级别不具有新车趋势的可能,但从易于管理的实现角度可以做此处理
-                                        # 2016-04-17
-                                        # 只有在本级别中枢最后确认为趋势形成的时候才激活Bucket
-                                        # Bucket牵扯到多次数据库的读取,控制必要的读取次数也就是优化效率
-
-                                        if not self._bucket.isFrozen():
-
-                                            print('Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于非交易状态')
-
-                                            if self._bucket.isBucketAct():
-
-                                                # 2016-04-26
-                                                # 相邻的一个中枢没有附着Bucket
-                                                #
-                                                # 2016-05-08
-
-                                                #if last_hub.isSticky != True:
-
-                                                if not self._bucket.isEntryAct():
-
-                                                    # print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢没有附着Bucket')
-
-                                                    print('Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,但买卖点没有形成')
-
-                                                    self._bucket.deactBucket()
-
-                                                    print('Hub_Container.insertHub()--去激活Bucket')
-
-                                                    self._bucket.activeBucket(hub.ZD)
-
-                                                    # 2016-05-09
-                                                    # 测试代码
-                                                    self._bucket._trans.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZD)
-
-                                                    print('Hub_Container.insertHub()--重新激活Bucket,Exit为ZD', hub.ZD)
-
-                                                    # hub.isSticky = True
-
-                                                    # 2016-04-23
-                                                    # 配置Bucket走势方向属性
-                                                    self._bucket.setTrending('Down')
-
-                                                    print('Hub_Container.insertHub()--Bucket方向:DOWN')
-
-                                                    # 2016-05-04
-                                                    # 这个实现虽然可以提前构造次级别点形态,但由于其他太多,可能出现在对历史次级别对构造过程中就触发了买卖点
-                                                    # 这是不合理的!!! 买卖点只能发生在未来而不是过去的数据
-                                                    # 但为了给次级别实现部分的提前加载,可以从当前中枢已识别出来的最后一笔开始加载,而非中枢的起始笔
-                                                    print('Hub_Container.insertHub()--中枢生成次级别数据加载笔范围',
-                                                          self.pens.container[len(self.pens.container) - 1].beginType.candle_index,
-                                                          self.pens.container[len(self.pens.container) - 1].endType.candle_index)
-
-                                                    for t in range(self.pens.container[len(self.pens.container) - 1].beginType.candle_index,
-                                                                   self.pens.container[len(self.pens.container) - 1].endType.candle_index):
-
-                                                        self._bucket.loadCandleID(t)
-
-
-                                                # 2016-04-26
-                                                # 如果上一个中枢有附着Bucket,同时本中枢又同向,这种情况又可能是盘整,要避免错杀盘整的情况
-                                                # 不对Bucket做任何处理
-
-                                                # 2016-05-08
-                                                else:
-
-                                                    # hub.isSticky = False
-
-                                                    # print('Ten_Min_Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,相邻中枢附着Bucket,暂时不做处理,背驰可能出现在盘整')
-
-                                                    print('Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于激活状态,买卖点已经形成,暂时不做处理,')
-
-                                            else:
-
-                                                self._bucket.activeBucket(hub.ZD)
-
-                                                # 2016-05-09
-                                                # 测试代码
-                                                self._bucket._trans.actTran(hub.s_pen.beginType.candle_index, last_hub.s_pen.beginType.candle_index, hub.ZD)
-
-                                                print('Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于非激活状态,直接激活Bucket')
-
-                                                print('Hub_Container.insertHub()--Bucket方向:Down')
-
-                                                # hub.isSticky = True
-
-                                                # 2016-04-23
-                                                # 配置Bucket走势方向属性
-                                                self._bucket.setTrending('Down')
-
-                                                # 2016-05-04
-                                                # 这个实现虽然可以提前构造次级别点形态,但由于其他太多,可能出现在对历史次级别对构造过程中就触发了买卖点
-                                                # 这是不合理的!!! 买卖点只能发生在未来而不是过去的数据
-                                                # 但为了给次级别实现部分的提前加载,可以从当前中枢已识别出来的最后一笔开始加载,而非中枢的起始笔
-                                                print('Hub_Container.insertHub()--中枢生成次级别数据加载笔范围',
-                                                      self.pens.container[len(self.pens.container) - 1].beginType.candle_index,
-                                                      self.pens.container[len(self.pens.container) - 1].endType.candle_index)
-
-                                                for t in range(self.pens.container[len(self.pens.container) - 1].beginType.candle_index,
-                                                               self.pens.container[len(self.pens.container) - 1].endType.candle_index):
-
-                                                    self._bucket.loadCandleID(t)
-                                        else:
-
-                                            print('Hub_Container.insertHub()--连续两次同向中枢出现,Bucket处于交易状态,不做任何处理')
-
-                                    else:
-
-                                        print('Hub_Container.insertHub()--上一中枢范围不合理,不做任何本级别交易处理')
-                                """
 
                                 return 1
 
@@ -2115,14 +1735,14 @@ class Hour_Hub_Container(Hub_Container):
 # 不同级别的数据对于形态构成后的处理方式是不一样的
 # 10分钟级别如果是做为最高级别或者中间级别处理,那么当本级别趋势确认的时候会生成Bucket去加载次级别数据,但如果已经是做为最小级别处理,当趋势确认的时候会触发买卖点交易
 class Ten_Min_Hub_Container(Hub_Container):
-    def __init__(self, pens, bucket):
-        Hub_Container.__init__(self, pens, bucket)
+    def __init__(self, pens):
+        Hub_Container.__init__(self, pens)
 
 
 class One_Min_Hub_Container(Hub_Container):
-    def __init__(self, pens, bucket):
+    def __init__(self, pens):
 
-        Hub_Container.__init__(self, pens, bucket)
+        Hub_Container.__init__(self, pens)
 
     # 函数重载
     # 由于1分钟级别是做为次级别操作,父类的具体实现不适合于此子类,所以重载
