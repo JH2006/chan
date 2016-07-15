@@ -586,11 +586,22 @@ class S2:
         生成新的建仓交易
         已经存在的交易准备平仓
         """
-        # 转移已有交易
-        self._curTran[Tran.PROCESS] = self._curTran[Tran.START]
+        t = self._curTran[Tran.START]
 
-        # 生成新交易
-        self._curTran[Tran.START] = Tran(curHub.pos)
+        # 同时判断这个新中枢导致已有交易是止损还是盈利
+        # 新中枢与之前交易的中枢同向,为止损
+        if self._curHub.pos == curHub.pos:
+
+            t._op = Tran.OP_LOSS
+
+        # 新中枢与之前中枢反向,为获利
+        else:
+
+            t._op = Tran.OP_GAIN
+
+        # 转移已有交易
+        self._curTran[Tran.PROCESS] = t
+
 
         hub_k_pos = curHub.e_pen.endType.candle_index
         last_k_post = event._dict['len_cans']
@@ -606,7 +617,6 @@ class S2:
 
             # 复位交易指示器
             self._isTraded = False
-
 
     """
     一个Common的对新K线生成的响应接口
@@ -704,8 +714,8 @@ class Tran:
     PROCESS = 'PROCESS'
     START = 'START'
 
-    OP_LONG = 'LONG'
-    OP_SHORT = 'SHORT'
+    OP_LOSS = 'LOSS'
+    OP_GAIN = 'GAIN'
 
     ENTER_K = 'ENTER_K'
     ENTER_P = 'ENTER_POINT'
@@ -721,18 +731,11 @@ class Tran:
     EXIT_HUB_ZD = 'EX_HUB_ZD'
     EXIT_HUB_M = 'EX_HUB_MID'
 
-    def __init__(self, pos):
+    def __init__(self):
 
         self._buf = {}
-        self._buf[Tran.STATS] = Tran.START
+        self._op = ''
 
-        if pos == 'Up':
-
-            self._op = Tran.OP_SHORT
-
-        else:
-
-            self._op = Tran.OP_LONG
 
     def __del__(self):
 
