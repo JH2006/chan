@@ -581,14 +581,21 @@ class S2:
 
                 pass
 
+        """
+        新中枢生成会出现两个影响:
+        生成新的建仓交易
+        已经存在的交易准备平仓
+        """
+        # 转移已有交易
+        self._curTran[Tran.PROCESS] = self._curTran[Tran.START]
+
+        # 生成新交易
+        self._curTran[Tran.START] = Tran(curHub.pos)
+
         hub_k_pos = curHub.e_pen.endType.candle_index
         last_k_post = event._dict['len_cans']
 
         print('New Hub ID:', event._dict['hub_id'], 'Last C of Hub:', hub_k_pos, 'Current C:', last_k_post)
-
-        # 建仓和建仓应该保持相同条件
-        # 在K线数量上满足操作条件 and 价格交集满足条件
-        # Single-1
 
         if not self.isTrade(event):
 
@@ -612,6 +619,8 @@ class S2:
 
     """
     负责完成建仓逻辑的判断
+    1. 5根K线
+    2. Cross信号出现
     """
     def isEnter(self, event):
 
@@ -675,17 +684,23 @@ class S2:
 
     """
     负责清仓逻辑判断
+    1.
     """
     def isExit(self, event):
 
-        pass
+        # 获取当下等待平仓的交易
+        try:
+
+            p_tran = self._curTran[Tran.PROCESS]
+
+        except KeyError:
+
+            print('无交易等待')
 
 
 class Tran:
 
-    LIFECYCLE = 'lifecycle'
     STATS = ''
-    END = 'END'
     PROCESS = 'PROCESS'
     START = 'START'
 
@@ -706,12 +721,18 @@ class Tran:
     EXIT_HUB_ZD = 'EX_HUB_ZD'
     EXIT_HUB_M = 'EX_HUB_MID'
 
-    def __init__(self):
+    def __init__(self, pos):
 
         self._buf = {}
-
-        self._buf[Tran.LIFECYCLE] = 0
         self._buf[Tran.STATS] = Tran.START
+
+        if pos == 'Up':
+
+            self._op = Tran.OP_SHORT
+
+        else:
+
+            self._op = Tran.OP_LONG
 
     def __del__(self):
 
