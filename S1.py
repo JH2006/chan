@@ -259,7 +259,7 @@ class S2:
         self._mPrice = -1
 
         # 当前还在执行的交易，由class Tran的实例构成
-        self._curTran = []
+        self._curTran = {}
 
         # 交易记录存档
         self._trans = []
@@ -329,11 +329,11 @@ class S2:
         
         # 2
         self._curTran.append(self._curHub.e_pen.endType.candle_index)
-        print('Last K of 3th pen:', self._curHub.e_pen.endType.candle_index)
+        print('3th pen K:', self._curHub.e_pen.endType.candle_index)
 
         # 3
         self._curTran.append(event._dict['len_cans'])
-        print('entry operate K ID:', event._dict['len_cans'])
+        print('entry K :', event._dict['len_cans'])
 
         self._curSize = self.position(event)
 
@@ -439,11 +439,11 @@ class S2:
         print('Current Hub Pos:', curHub.pos)
 
         # 1
-        print('Last K of 3th pen:', curHub.e_pen.endType.candle_index)
+        print('3th pen K:', curHub.e_pen.endType.candle_index)
         self._curTran.append(curHub.e_pen.endType.candle_index)
 
         # 2
-        print('Exit operate K ID:', event._dict['len_cans'])
+        print('Exit K:', event._dict['len_cans'])
         self._curTran.append(event._dict['len_cans'])
 
         # 3
@@ -608,6 +608,13 @@ class S2:
     """
     def isTrade(self, event):
 
+        self.isEnter(event)
+
+    """
+    负责完成建仓逻辑的判断
+    """
+    def isEnter(self, event):
+
         curHub = event._dict['hub']
         last_k_post = event._dict['len_cans']
 
@@ -629,12 +636,12 @@ class S2:
 
         # Single-1
         if curHub.pos == 'Up' and mid <= close <= curHub.ZG:
-            
+
             cross = True
 
             s = 'Cross meet mid <= close <= curHub.ZG' + repr(mid) + ',' + repr(close) + ',' + repr(curHub.ZG)
 
-        elif curHub.pos == 'Down' and  curHub.ZD <= close <= mid:
+        elif curHub.pos == 'Down' and curHub.ZD <= close <= mid:
 
             s = 'Cross meet curHub.ZD <= close <= mid' + repr(curHub.ZD) + ',' + repr(close) + ',' + repr(mid)
 
@@ -649,12 +656,11 @@ class S2:
         #print(s)
 
         # Single-2
-        # 建仓和清仓
         # 在K线数量上满足操作条件
         if last_k_post - hub_k_pos >= 5 and cross:
 
-            # 清仓
-            self.exit(event)
+            # # 清仓
+            # self.exit(event)
             # 建仓
             self.enter(event)
 
@@ -667,11 +673,21 @@ class S2:
 
             return False
 
+    """
+    负责清仓逻辑判断
+    """
+    def isExit(self, event):
+
+        pass
+
 
 class Tran:
 
     LIFECYCLE = 'lifecycle'
-    STATS = 'STATS'
+    STATS = ''
+    END = 'END'
+    PROCESS = 'PROCESS'
+    START = 'START'
 
     OP_LONG = 'LONG'
     OP_SHORT = 'SHORT'
@@ -695,6 +711,7 @@ class Tran:
         self._buf = {}
 
         self._buf[Tran.LIFECYCLE] = 0
+        self._buf[Tran.STATS] = Tran.START
 
     def __del__(self):
 
