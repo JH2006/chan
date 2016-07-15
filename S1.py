@@ -246,8 +246,6 @@ class S1:
 
 class S2:
 
-    _trans = []
-
     def __init__(self):
 
         # 当下K线价格(实际价格)
@@ -260,8 +258,11 @@ class S2:
         # 中枢中间价格(理论价)
         self._mPrice = -1
 
-        # 交易记录
+        # 当前还在执行的交易，由class Tran的实例构成
         self._curTran = []
+
+        # 交易记录存档
+        self._trans = []
 
         # 交易编码(用于调试)
         self._i = 0
@@ -284,6 +285,11 @@ class S2:
         # 是否交易已经发生
         # 当前中枢如果发生了交易就设置为True
         self._isTraded = False
+
+    def __del__(self):
+
+        self._trans = []
+        self._curTran = []
 
     def process(self, event):
 
@@ -662,6 +668,37 @@ class S2:
             return False
 
 
+class Tran:
+
+    LIFECYCLE = 'lifecycle'
+    STATS = 'STATS'
+
+    OP_LONG = 'LONG'
+    OP_SHORT = 'SHORT'
+
+    ENTER_K = 'ENTER_K'
+    ENTER_P = 'ENTER_POINT'
+
+    EXIT_K = 'EXIT_K'
+    EXIT_P = 'EXIT_POINT'
+
+    ENTER_HUB_ZG = 'EN_HUB_ZG'
+    ENTER_HUB_ZD = 'EN_HUB_ZD'
+    ENTER_HUB_M = 'EN_HUB_MID'
+
+    EXIT_HUB_ZG = 'EX_HUB_ZG'
+    EXIT_HUB_ZD = 'EX_HUB_ZD'
+    EXIT_HUB_M = 'EX_HUB_MID'
+
+    def __init__(self):
+
+        self._buf = {}
+
+        self._buf[Tran.LIFECYCLE] = 0
+
+    def __del__(self):
+
+        self._buf.clear()
 
 
 
