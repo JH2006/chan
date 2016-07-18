@@ -195,3 +195,11 @@ class Monitor:
     def genEvent(self, event):
 
         return Event(event)
+
+    def enter(self, event):
+
+        self._s.isEnter(event)
+
+    def exit(self, event):
+
+        self._s.isExit(event)

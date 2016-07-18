@@ -577,7 +577,7 @@ class S2:
 
                         event._dict['hub'].pos = 'Down'
 
-            except:
+            except BaseException:
 
                 pass
 
@@ -586,37 +586,49 @@ class S2:
         生成新的建仓交易
         已经存在的交易准备平仓
         """
-        t = self._curTran[Tran.START]
 
-        # 同时判断这个新中枢导致已有交易是止损还是盈利
-        # 新中枢与之前交易的中枢同向,为止损
-        if self._curHub.pos == curHub.pos:
+        try:
+            t = self._curTran[Tran.START]
 
-            t._op = Tran.OP_LOSS
+            # 同时判断这个新中枢导致已有交易是止损还是盈利
+            # 新中枢与之前交易的中枢同向,为止损
+            if self._curHub.pos == curHub.pos:
 
-        # 新中枢与之前中枢反向,为获利
-        else:
+                t._op = Tran.OP_LOSS
 
-            t._op = Tran.OP_GAIN
+            # 新中枢与之前中枢反向,为获利
+            else:
 
-        # 转移已有交易
-        self._curTran[Tran.PROCESS] = t
+                t._op = Tran.OP_GAIN
 
+            # 转移已有交易
+            self._curTran[Tran.PROCESS] = t
+
+        except BaseException:
+
+            return
 
         hub_k_pos = curHub.e_pen.endType.candle_index
         last_k_post = event._dict['len_cans']
 
         print('New Hub ID:', event._dict['hub_id'], 'Last C of Hub:', hub_k_pos, 'Current C:', last_k_post)
 
-        if not self.isTrade(event):
-
-             # 当下不满足交易条件,需要追踪单一K线级别状态变化
-            # 注册K线生成事件监听接口
-            # 根据当前的交易策略,只有一个地方实现此监听接口注销:买卖点成功执行 self.enter()
-            self._monitor._e.register(Event.Monitor.CAN_BORN, self._monitor.can_born)
+        # 当下不满足建仓交易条件,需要追踪单一K线级别状态变化
+        # 注册K线生成事件监听接口
+        # 根据当前的交易策略,只有一个地方实现此监听接口注销:买卖点成功执行 self.enter()
+        if not self.isEnter(event):
+            self._monitor._e.register(Event.Monitor.CAN_BORN, self._monitor.enter)
 
             # 复位交易指示器
             self._isTraded = False
+
+        # 平仓条件和建仓条件独立存在
+        # 当下不满足平仓交易条件,需要追踪单一K线级别状态变化
+        # 注册K线生成事件监听接口
+        # 根据当前的交易策略,只有一个地方实现此监听接口注销:买卖点成功执行 self.exit()
+        if not self.isExit(event):
+
+            self._monitor._e.register(Event.Monitor.CAN_BORN, self._monitor.exit)
 
     """
     一个Common的对新K线生成的响应接口
@@ -628,7 +640,7 @@ class S2:
         self.isEnter(event)
 
     """
-    负责完成建仓逻辑的判断
+    完成建仓逻辑的判断
     1. 5根K线
     2. Cross信号出现
     """
@@ -647,9 +659,9 @@ class S2:
 
             mid = (curHub.ZD + curHub.ZG)/2
 
-        except:
+        except BaseException:
 
-            return
+            return 
 
         hub_k_pos = curHub.e_pen.endType.candle_index
 
@@ -672,14 +684,12 @@ class S2:
 
             s = 'Cross NOT meet'
 
-        #print(s)
+        print(s)
 
         # Single-2
         # 在K线数量上满足操作条件
         if last_k_post - hub_k_pos >= 5 and cross:
 
-            # # 清仓
-            # self.exit(event)
             # 建仓
             self.enter(event)
 
@@ -693,7 +703,7 @@ class S2:
             return False
 
     """
-    负责清仓逻辑判断
+    清平仓逻辑判断
     1.
     """
     def isExit(self, event):
@@ -706,6 +716,7 @@ class S2:
         except KeyError:
 
             print('无交易等待')
+            return
 
 
 class Tran:
