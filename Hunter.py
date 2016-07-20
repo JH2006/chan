@@ -459,6 +459,10 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             single = hubs.insertHub()
 
+            # 2016-07-20
+            # 修正中枢边界
+            hubs.modifySize()
+
             # 中枢生成事件注入
             if single == 1:
 
@@ -1576,6 +1580,38 @@ class Hub_Container:
 
         return len(self.container)
 
+    # 2016-07-20
+    # 修正中枢边界
+    # 随着分型结构出现以及中枢前三笔的不断修正，中枢的ZG/ZD区间会有所变化
+    # 当前实现是在新中枢出现前会不断追踪变化，理论上前三笔变化不会持续如此长时间，在不影响性能的情况下可以接受
+    def modifySize(self):
+
+        try:
+
+            hub =  self.container[self.size() - 1]
+            pen_index = hub.s_pen_index
+
+        except IndexError:
+
+            return
+
+        h = []
+        l = []
+
+        try: 
+
+            for i in range(pen_index, self.hub_width + pen_index):
+
+                h.append(self.pens.container[i].high)
+                l.append(self.pens.container[i].low)
+
+        except IndexError:
+
+            return 
+
+        hub.ZG = min(h)
+        hub.ZD = max(l)
+
     def isHub(self, index):
 
         h = []
@@ -1708,6 +1744,7 @@ class Hub_Container:
 
 
 class Hour_Hub_Container(Hub_Container):
+
     def __init__(self, pens, bucket):
         Hub_Container.__init__(self, pens, bucket)
 
