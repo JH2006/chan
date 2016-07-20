@@ -873,8 +873,13 @@ class Pen_Container():
         cur_high = self.__types.container[self.types_index].candle.getHigh()
         cur_low = self.__types.container[self.types_index].candle.getLow()
 
+        s = False
+
         # 由于存在向前延伸的行为,数组遍历最大仅能到倒数第二个
-        for j in range(self.types_index, self.__types.size() - 1):
+
+        # 2016-07-20
+        # 代码优化删除了仅能处理到倒数第二个分型的约束
+        for j in range(self.types_index, self.__types.size()):
 
             # 当前分型为顶分型
             if self.__types.container[j].getPos() == 'Up':
@@ -886,36 +891,28 @@ class Pen_Container():
                     # 记录最后满足条件的信息
                     cur_high = self.__types.container[j].candle.getHigh()
                     self.types_index = j
+                    s = True
 
-                    # 如果当前顶分型的下一个分型为底分型,同时底分型的低点低于当前顶分型的高点,则说明构造潜在向下笔的条件成立
-                    # 此时认为构造当前向上笔完成,返回已记录的最高顶分型指针
-                    if self.__types.container[j + 1].getPos() == 'Down' and \
-                                    self.__types.container[j + 1].candle.getHigh() < self.__types.container[
-                                j].candle.getHigh() and \
-                                    self.__types.container[j + 1].candle.getLow() < self.__types.container[
-                                j].candle.getLow():
+        if s:
 
-                        return self.types_index
+            return self.types_index
 
-                    # 或者下一笔虽然为同向笔,但具有反向性质
-                    elif self.__types.container[j + 1].getPos() == 'Up' and \
-                                    self.__types.container[j + 1].candle.getHigh() < self.__types.container[
-                                j].candle.getHigh() and \
-                                    self.__types.container[j + 1].candle.getLow() < self.__types.container[
-                                j].candle.getLow():
+        else:
 
-                        return self.types_index
-
-        # 遍历结束,返回结束标示
-        return -1
+            return -1
 
     def probeDown(self):
 
         cur_high = self.__types.container[self.types_index].candle.getHigh()
         cur_low = self.__types.container[self.types_index].candle.getLow()
 
-        # 由于存在向前延伸的行为,数组遍历最大仅能到倒数第二个
-        for j in range(self.types_index, self.__types.size() - 1):
+        s = False
+
+        # 由于存在向前延伸的行为,分形数组遍历最大仅能到倒数第二个
+
+        # 2016-07-20
+        # 代码优化删除了仅能处理到倒数第二个分型的约束
+        for j in range(self.types_index, self.__types.size()):
 
             if self.__types.container[j].getPos() == 'Down':
 
@@ -926,29 +923,15 @@ class Pen_Container():
                     # 记录最后满足条件的信息
                     cur_low = self.__types.container[j].candle.getLow()
                     self.types_index = j
+                    s = True
 
-                    # 要同时满足以下条件才能构成笔
-                    # 下一个分型为反向分型.目前的实现是认为出现反向分型则此笔结束
-                    # 构成向上笔的顶底分型必须同时满足条件以避开包含关系
-                    if self.__types.container[j + 1].getPos() == 'Up' and \
-                                    self.__types.container[j + 1].candle.getHigh() > self.__types.container[
-                                j].candle.getHigh() and \
-                                    self.__types.container[j + 1].candle.getLow() > self.__types.container[
-                                j].candle.getLow():
+        if s:
 
-                        return self.types_index
+            return self.types_index
+        
+        else:
 
-                    # 或者下一笔虽然为同向笔,但具有反向性质
-                    elif self.__types.container[j + 1].getPos() == 'Down' and \
-                                    self.__types.container[j + 1].candle.getHigh() > self.__types.container[
-                                j].candle.getHigh() and \
-                                    self.__types.container[j + 1].candle.getLow() > self.__types.container[
-                                j].candle.getLow():
-
-                        return self.types_index
-
-        # 遍历结束,返回结束标示
-        return -1
+            return -1
 
     # 处理不满足构成笔K线数量要求的情况
     # 处理不合法笔的关键在于当考虑把此不合法笔撤销的时候,如何处理此操作所可能引起的前后关联笔环境的变化
@@ -1600,7 +1583,6 @@ class Hub_Container:
 
         # 偏置位从1开始,其实是避开了第一个K线.理论上第一个K线不属于中枢
         # 注意遍历的范围为width+1而不是width
-
         for i in range(0, self.hub_width + 1):
             h.append(self.pens.container[i + index].high)
             l.append(self.pens.container[i + index].low)
