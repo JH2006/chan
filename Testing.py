@@ -235,7 +235,7 @@ def test_years(market, year_1, year_2):
 
 if __name__ == '__main__':
 
-    print('testing.....')
+    print('testing.....for cherry pick')
 
     test_month_10('', 2005, 1)
 
