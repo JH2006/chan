@@ -716,6 +716,7 @@ class S2:
         except KeyError:
 
             print('无交易等待')
+
             return
 
 
