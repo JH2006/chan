@@ -597,6 +597,27 @@ class S2:
         #     self._isTraded = False
 
 
+    def fourPen(self, event):
+
+        hub = event._dict['hub']
+        pens = event._dict['pens']
+
+        first_pen_index = hub.s_pen_index
+        third_pen = pens[first_pen_index + 2]
+
+        if third_pen.legal():
+
+            try:
+
+                fourth_pen = pens[first_pen_index + 3]
+
+                return fourth_pen.legal()
+
+            except IndexError:
+
+                return False
+
+
     """
     一个Common的对新K线生成的响应接口
     主要负责对当下新生成K线做一些判断是否可以执行买卖逻辑
