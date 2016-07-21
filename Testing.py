@@ -235,7 +235,7 @@ def test_years(market, year_1, year_2):
 
 if __name__ == '__main__':
 
-    test_month_10('', 2005, 2)
+    test_month_10('', 2005, 1)
 
     #for i in range(2005, 2006):
     #    test_year(i, 1, 12)

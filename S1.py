@@ -246,6 +246,8 @@ class S1:
 
 class S2:
 
+    _trans = []
+
     def __init__(self):
 
         # 当下K线价格(实际价格)
@@ -258,11 +260,8 @@ class S2:
         # 中枢中间价格(理论价)
         self._mPrice = -1
 
-        # 当前还在执行的交易，由class Tran的实例构成
-        self._curTran = {}
-
-        # 交易记录存档
-        self._trans = []
+        # 交易记录
+        self._curTran = []
 
         # 交易编码(用于调试)
         self._i = 0
@@ -285,11 +284,6 @@ class S2:
         # 是否交易已经发生
         # 当前中枢如果发生了交易就设置为True
         self._isTraded = False
-
-    def __del__(self):
-
-        self._trans = []
-        self._curTran = []
 
     def process(self, event):
 
@@ -316,8 +310,8 @@ class S2:
 
             return
 
-        print('###########################')
-        print('Tran ID:', self._i)
+        #print('###########################')
+        #print('Tran ID:', self._i)
 
         # 中枢生成具有延迟性,最后的买卖点需要以最后一根K线收盘价为参考,而不能直接以中枢的高点为做空价格
         lastCandle = event._dict['can']
@@ -325,15 +319,15 @@ class S2:
 
         # 1
         self._curTran.append(self._curHub.pos)
-        print('Hub Pos:', self._curHub.pos)
+        #print('Hub Pos:', self._curHub.pos)
         
         # 2
         self._curTran.append(self._curHub.e_pen.endType.candle_index)
-        print('3th pen K:', self._curHub.e_pen.endType.candle_index)
+        #print('中枢确认K线:', self._curHub.e_pen.endType.candle_index)
 
         # 3
         self._curTran.append(event._dict['len_cans'])
-        print('entry K :', event._dict['len_cans'])
+        #print('建仓操作K线:', event._dict['len_cans'])
 
         self._curSize = self.position(event)
 
@@ -348,12 +342,12 @@ class S2:
 
             self._entryPrice = 0
 
-            self._monitor._e.unregister(Event.Monitor.CAN_BORN, self._monitor.can_born)
+            self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.k_gen)
             print('illegal position')
 
             return
 
-        print('position size', self._curSize)
+        #print('position size', self._curSize)
 
         # 4
         self._curTran.append(self._curSize)
@@ -372,24 +366,24 @@ class S2:
         # 6 ZD
         self._curTran.append(self._curHub.ZD)
 
-        print('ZG:', self._curHub.ZG, '  ZD:', self._curHub.ZD)
+        #print('ZG:', self._curHub.ZG, '  ZD:', self._curHub.ZD)
 
         # 7 理论价格 -- 中枢边界值
         self._curTran.append(self._rPrice)
-        print('Benchmark entry point(edge of hub):', self._rPrice)
+        #print('Benchmark entry point(edge of hub):', self._rPrice)
 
         # 8 理论最优价格 -- 中枢平均值
         self._mPrice = (self._curHub.ZG + self._curHub.ZD) / 2
         self._curTran.append(self._mPrice)
-        print('Benchmark entry point(mid of hub):', self._mPrice)
+        #print('Benchmark entry point(mid of hub):', self._mPrice)
 
         # 9
         self._curTran.append(self._entryPrice)
-        print('Practical entry point(current K close):', self._entryPrice)
+        #print('actual entry point(current K close):', self._entryPrice)
 
-        print('Hub ZG:', self._curHub.ZG, 'Hub ZD:', self._curHub.ZD)
+        #print('Hub ZG:', self._curHub.ZG, 'Hub ZD:', self._curHub.ZD)
 
-        self._monitor._e.unregister(Event.Monitor.CAN_BORN, self._monitor.can_born)
+        self.monitor.e.unregister(Event.Monitor.K_GEN, self._monitor.k_gen)
 
     def exit(self, event):
 
@@ -435,15 +429,15 @@ class S2:
 
         exitP = lastCandle.getClose()
 
-        print('Pre Hub.Pos:', self._curHub.pos)
-        print('Current Hub Pos:', curHub.pos)
+        #print('Pre Hub.Pos:', self._curHub.pos)
+        #print('Current Hub Pos:', curHub.pos)
 
         # 1
-        print('3th pen K:', curHub.e_pen.endType.candle_index)
+        #print('中枢确认K线:', curHub.e_pen.endType.candle_index)
         self._curTran.append(curHub.e_pen.endType.candle_index)
 
         # 2
-        print('Exit K:', event._dict['len_cans'])
+        #print('平仓操作K线:', event._dict['len_cans'])
         self._curTran.append(event._dict['len_cans'])
 
         # 3
@@ -452,19 +446,19 @@ class S2:
         # 4
         self._curTran.append(curHub.ZD)
 
-        print('ZG:', self._curHub.ZG, '  ZD:', self._curHub.ZD)
+        #print('ZG:', self._curHub.ZG, '  ZD:', self._curHub.ZD)
 
         # 5
-        print('Benchmark Exit point(edge of hub):', ePrice)
+        #print('Benchmark Exit point(edge of hub):', ePrice)
         self._curTran.append(ePrice)
         
         # 6
-        print('Benchmakr Exit point(mid of hub ):', mPrice)
+        #print('Benchmakr Exit point(mid of hub ):', mPrice)
         self._curTran.append(mPrice)
 
         # 7
         self._curTran.append(exitP)
-        print('practical exit point(current K close):', exitP)
+        #print('practical exit point(current K close):', exitP)
 
         if self._curHub.pos == 'Up':
 
@@ -478,14 +472,14 @@ class S2:
                  
         # 8
         self._curTran.append(profit_1)
-        print('理论获利:', profit_1)
+        #print('理论获利:', profit_1)
 
         # 9
         self._curTran.append(profit_2)
-        print('实际获利:', profit_2)
+        #print('实际获利:', profit_2)
 
-        print('trend id', self._i)
-        print('###########################')
+        #print('trend id', self._i)
+        #print('###########################')
 
         S2._trans.append(copy.deepcopy(self._curTran))
 
@@ -545,90 +539,63 @@ class S2:
         curHub = event._dict['hub']
 
         # 每次产生新中枢的时候都对上一个中枢是否有发生交易做判断
-        if not self._isTraded:
-
-            preHub = self._curHub
-
-            try:
-
-                if preHub.ZD > curHub.ZG:
-
-                    event._dict['hub'].pos = 'Down'
-
-                elif preHub.ZG < curHub.ZD:
-
-                    event._dict['hub'].pos = 'Up'
-
-                elif preHub.ZG < curHub.ZG and preHub.ZG > curHub.ZD:
-
-                    event._dict['hub'].pos = 'Up'
-
-                elif preHub.ZD < curHub.ZG and preHub.ZD > curHub.ZD:
-
-                    event._dict['hub'].pos = 'Down'
-
-                else:
-
-                    if preHub.pos == 'Down':
-
-                        event._dict['hub'].pos = 'Up'
-
-                    else:
-
-                        event._dict['hub'].pos = 'Down'
-
-            except BaseException:
-
-                pass
-
-        """
-        新中枢生成会出现两个影响:
-        生成新的建仓交易
-        已经存在的交易准备平仓
-        """
-
-        try:
-            t = self._curTran[Tran.START]
-
-            # 同时判断这个新中枢导致已有交易是止损还是盈利
-            # 新中枢与之前交易的中枢同向,为止损
-            if self._curHub.pos == curHub.pos:
-
-                t._op = Tran.OP_LOSS
-
-            # 新中枢与之前中枢反向,为获利
-            else:
-
-                t._op = Tran.OP_GAIN
-
-            # 转移已有交易
-            self._curTran[Tran.PROCESS] = t
-
-        except BaseException:
-
-            return
+        # if not self._isTraded:
+        #
+        #     preHub = self._curHub
+        #
+        #     try:
+        #
+        #         if preHub.ZD > curHub.ZG:
+        #
+        #             event.dict['hub'].pos = 'Down'
+        #
+        #         elif preHub.ZG < curHub.ZD:
+        #
+        #             event.dict['hub'].pos = 'Up'
+        #
+        #         elif preHub.ZG < curHub.ZG and preHub.ZG > curHub.ZD:
+        #
+        #             event.dict['hub'].pos = 'Up'
+        #
+        #         elif preHub.ZD < curHub.ZG and preHub.ZD > curHub.ZD:
+        #
+        #             event.dict['hub'].pos = 'Down'
+        #
+        #         else:
+        #
+        #             if preHub.pos == 'Down':
+        #
+        #                 event._dict['hub'].pos = 'Up'
+        #
+        #             else:
+        #
+        #                 event._dict['hub'].pos = 'Down'
+        #
+        #     except KeyError:
+        #
+        #         pass
 
         hub_k_pos = curHub.e_pen.endType.candle_index
         last_k_post = event._dict['len_cans']
 
-        print('New Hub ID:', event._dict['hub_id'], 'Last C of Hub:', hub_k_pos, 'Current C:', last_k_post)
+        print('New Hub ID:', event._dict['hub_id'], '中枢确认K线:', hub_k_pos, '当下K线:', last_k_post)
 
-        # 当下不满足建仓交易条件,需要追踪单一K线级别状态变化
-        # 注册K线生成事件监听接口
-        # 根据当前的交易策略,只有一个地方实现此监听接口注销:买卖点成功执行 self.enter()
-        if not self.isEnter(event):
-            self._monitor._e.register(Event.Monitor.CAN_BORN, self._monitor.enter)
+        self.monitor.e.register(Event.Monitor.K_GEN, self._monitor.k_gen)
 
-            # 复位交易指示器
-            self._isTraded = False
+        # 建仓和建仓应该保持相同条件
+        # 在K线数量上满足操作条件 and 价格交集满足条件
+        # Single-1
 
-        # 平仓条件和建仓条件独立存在
-        # 当下不满足平仓交易条件,需要追踪单一K线级别状态变化
-        # 注册K线生成事件监听接口
-        # 根据当前的交易策略,只有一个地方实现此监听接口注销:买卖点成功执行 self.exit()
-        if not self.isExit(event):
+        # if not self.isTrade(event):
+        #
+        #      # 当下不满足交易条件,需要追踪单一K线级别状态变化
+        #     # 注册K线生成事件监听接口
+        #     # 根据当前的交易策略,只有一个地方实现此监听接口注销:买卖点成功执行 self.enter()
+        #     self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.k_gen)
+        #
+        #     # 复位交易指示器
+        #     self._isTraded = False
 
-            self._monitor._e.register(Event.Monitor.CAN_BORN, self._monitor.exit)
 
     """
     一个Common的对新K线生成的响应接口
@@ -636,15 +603,6 @@ class S2:
     由Event.Monitor.can_born调用
     """
     def isTrade(self, event):
-
-        self.isEnter(event)
-
-    """
-    完成建仓逻辑的判断
-    1. 5根K线
-    2. Cross信号出现
-    """
-    def isEnter(self, event):
 
         curHub = event._dict['hub']
         last_k_post = event._dict['len_cans']
@@ -659,20 +617,20 @@ class S2:
 
             mid = (curHub.ZD + curHub.ZG)/2
 
-        except BaseException:
+        except KeyError:
 
-            return 
+            return
 
         hub_k_pos = curHub.e_pen.endType.candle_index
 
         # Single-1
         if curHub.pos == 'Up' and mid <= close <= curHub.ZG:
-
+            
             cross = True
 
             s = 'Cross meet mid <= close <= curHub.ZG' + repr(mid) + ',' + repr(close) + ',' + repr(curHub.ZG)
 
-        elif curHub.pos == 'Down' and curHub.ZD <= close <= mid:
+        elif curHub.pos == 'Down' and  curHub.ZD <= close <= mid:
 
             s = 'Cross meet curHub.ZD <= close <= mid' + repr(curHub.ZD) + ',' + repr(close) + ',' + repr(mid)
 
@@ -684,12 +642,15 @@ class S2:
 
             s = 'Cross NOT meet'
 
-        print(s)
+        #print(s)
 
         # Single-2
+        # 建仓和清仓
         # 在K线数量上满足操作条件
         if last_k_post - hub_k_pos >= 5 and cross:
 
+            # 清仓
+            self.exit(event)
             # 建仓
             self.enter(event)
 
@@ -701,23 +662,6 @@ class S2:
         else:
 
             return False
-
-    """
-    清平仓逻辑判断
-    1.
-    """
-    def isExit(self, event):
-
-        # 获取当下等待平仓的交易
-        try:
-
-            p_tran = self._curTran[Tran.PROCESS]
-
-        except KeyError:
-
-            print('无交易等待')
-
-            return
 
 
 class Tran:

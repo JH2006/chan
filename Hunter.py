@@ -441,7 +441,7 @@ class Ten_Min_Candle_Container(Candle_Container):
             pens.insertPen()
 
             # K线生成事件注入 
-            can = monitor.genEvent(Event.Monitor.CAN_BORN)
+            can = monitor.genEvent(Event.Monitor.K_GEN)
 
             try:
 
@@ -449,11 +449,11 @@ class Ten_Min_Candle_Container(Candle_Container):
                 can._dict['len_cans'] = len(self.container) - 1
                 can._dict['hub'] = hubs.container[len(hubs.container) - 1]
 
-            except:
+            except IndexError:
 
                 pass
 
-            monitor._e.put(can)
+            monitor.e.put(can)
 
             sleep(0.002)
 
@@ -461,34 +461,34 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             # 2016-07-20
             # 修正中枢边界
-            hubs.modifySize()
+            hubs.modHub()
 
             # 中枢生成事件注入
             if single == 1:
 
-                born = monitor.genEvent(Event.Monitor.HUB_BORN)
+                born = monitor.genEvent(Event.Monitor.HUB_GEN)
 
                 try:
 
                     # 当下中枢ID 
-                    born._dict['hub_id'] = len(hubs.container) - 1
+                    born.dict['hub_id'] = len(hubs.container) - 1
 
                     # 当下K线
-                    born._dict['can'] = self.container[len(self.container) - 1]
+                    born.dict['can'] = self.container[len(self.container) - 1]
 
                     # 当下K线队列长度
-                    born._dict['len_cans'] = len(self.container) - 1
+                    born.dict['len_cans'] = len(self.container) - 1
 
                     # 用于交易信息的传递
                     # 当下中枢
-                    born._dict['hub'] = hubs.container[len(hubs.container) - 1]
-                    born._dict['pre'] = hubs.container[len(hubs.container) - 2]
+                    born.dict['hub'] = hubs.container[len(hubs.container) - 1]
+                    born.dict['pre'] = hubs.container[len(hubs.container) - 2]
 
-                except:
+                except KeyError:
 
                     pass
 
-                monitor._e.put(born)
+                monitor.e.put(born)
 
                 sleep(0.002)
 
@@ -1584,16 +1584,19 @@ class Hub_Container:
     # 修正中枢边界
     # 随着分型结构出现以及中枢前三笔的不断修正，中枢的ZG/ZD区间会有所变化
     # 当前实现是在新中枢出现前会不断追踪变化，理论上前三笔变化不会持续如此长时间，在不影响性能的情况下可以接受
-    def modifySize(self):
+    def modHub(self):
 
         try:
 
             hub =  self.container[self.size() - 1]
             pen_index = hub.s_pen_index
 
+            ZG = hub.ZG
+            ZD = hub.ZD
+
         except IndexError:
 
-            return
+            return False
 
         h = []
         l = []
@@ -1607,10 +1610,18 @@ class Hub_Container:
 
         except IndexError:
 
-            return 
+            return False
 
         hub.ZG = min(h)
         hub.ZD = max(l)
+
+        if ZG != hub.ZG or ZD != hub.ZD:
+
+            return True
+
+        else:
+
+            return False
 
     def isHub(self, index):
 
@@ -2210,7 +2221,6 @@ class Transcation:
     def power(self, exit, entry):
         self.M_exit = exit
         self.M_entry = entry
-
 
 # 2016-05-22
 # 关于交易记录类对象化的思考

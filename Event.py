@@ -82,7 +82,7 @@ class EventEngine(object):
         if handler not in handlerList:
             handlerList.append(handler)
 
-        print('Registration', type_, handler)
+        #print('Registration', type_, handler)
 
     #----------------------------------------------------------------------
     def unregister(self, type_, handler):
@@ -99,7 +99,7 @@ class EventEngine(object):
             if not handlerList:
                 del self.__handlers[type_]
 
-            print('Unregistration', type_, handler)
+            #print('Unregistration', type_, handler)
 
         except KeyError:
             pass
@@ -124,10 +124,10 @@ class Monitor:
 
     # 事件编号
     # 每个事件都对应至少一个响应机制
-    HUB_BORN = 'hub_born'
+    HUB_GEN = 'hub_gen'
     HUB_GROW = 'hub_grow'
     HUB_END = 'hub_end'
-    CAN_BORN = 'can_born'
+    K_GEN = 'K_gen'
 
     def __init__(self, strategy):
 
@@ -142,7 +142,7 @@ class Monitor:
         self._e = EventEngine()
 
         # 事件响应处理注册
-        self._e.register(Monitor.HUB_BORN, self.hub_born)
+        self._e.register(Monitor.HUB_GEN, self.hub_gen)
         self._e.register(Monitor.HUB_GROW, self.hub_grow)
         self._e.register(Monitor.HUB_END, self.hub_end)
 
@@ -150,14 +150,14 @@ class Monitor:
 
     def __del__(self):
 
-        self._e.unregister(Monitor.HUB_BORN, self.hub_born)
+        self._e.unregister(Monitor.HUB_GEN, self.hub_gen)
         self._e.unregister(Monitor.HUB_GROW, self.hub_grow)
         self._e.unregister(Monitor.HUB_END, self.hub_end)
 
         self._e.stop()
 
     # 中枢生成事件处理接口
-    def hub_born(self, event):
+    def hub_gen(self, event):
 
         self._s.hub_born(event)
 
@@ -188,7 +188,7 @@ class Monitor:
     # 每根K线生成的时候都会注入事件，事件处理接口在什么时候注册和注销很重要
     # 当前实现在中枢生成是注册，交易结束或者监听取消时注销
     # 此接口的重要作用在于对当下形成的K线进行监听，根据一定的策略来进行买卖操作
-    def can_born(self, event):
+    def k_gen(self, event):
 
          self._s.isTrade(event) 
 
