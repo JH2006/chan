@@ -448,6 +448,7 @@ class Ten_Min_Candle_Container(Candle_Container):
                 can._dict['can'] = self.container[len(self.container) - 1]
                 can._dict['len_cans'] = len(self.container) - 1
                 can._dict['hub'] = hubs.container[len(hubs.container) - 1]
+                can._dict['pens'] = pens.container
 
             except IndexError:
 
@@ -767,12 +768,23 @@ class Type_Container:
 
 
 class Pen():
+
     def __init__(self, high, low, beginType, endType, pos):
         self.high = high
         self.low = low
         self.beginType = beginType
         self.endType = endType
         self.pos = pos
+
+    def legal(self):
+
+        if self.endType.candle_index - self.beginType.candle_index >= 4:
+
+            return True
+
+        else:
+
+            return False
 
 
 class Pen_Container():
