@@ -82,7 +82,7 @@ class EventEngine(object):
         if handler not in handlerList:
             handlerList.append(handler)
 
-        print('Register', type_, handler)
+        # print('Register', type_, handler)
 
     #----------------------------------------------------------------------
     def unregister(self, type_, handler):
@@ -99,7 +99,7 @@ class EventEngine(object):
             if not handlerList:
                 del self.__handlers[type_]
 
-            print('Deregister', type_, handler)
+            # print('Deregister', type_, handler)
 
         except KeyError:
             pass
@@ -183,14 +183,8 @@ class Monitor:
 
         pass
 
-    # 2016-7-2
-    # K线生产事件处理接口
-    # 每根K线生成的时候都会注入事件，事件处理接口在什么时候注册和注销很重要
-    # 当前实现在中枢生成是注册，交易结束或者监听取消时注销
-    # 此接口的重要作用在于对当下形成的K线进行监听，根据一定的策略来进行买卖操作
-    def k_gen(self, event):
-
-         # self._s.isTrade(event)
+    # 跟踪中枢第四笔确认点
+    def fourPen(self, event):
 
         self._s.fourPen(event)
 
@@ -200,7 +194,7 @@ class Monitor:
 
     def enter(self, event):
 
-        self._s.isEnter(event)
+        self._s.enter(event)
 
     def exit(self, event):
 

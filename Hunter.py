@@ -944,7 +944,7 @@ class Pen_Container():
         if s:
 
             return self.types_index
-        
+
         else:
 
             return -1

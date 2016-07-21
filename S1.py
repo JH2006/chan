@@ -293,6 +293,10 @@ class S2:
 
     def enter(self, event):
 
+        if not self.midCross(event):
+
+            return
+
         try:
 
             self._curHub = event._dict['hub']
@@ -310,46 +314,41 @@ class S2:
 
             return
 
-        #print('###########################')
-        #print('Tran ID:', self._i)
+        print('###########################')
+        print('Tran ID:', self._i)
 
-        # 中枢生成具有延迟性,最后的买卖点需要以最后一根K线收盘价为参考,而不能直接以中枢的高点为做空价格
         lastCandle = event._dict['can']
         self._entryPrice = lastCandle.getClose()
 
         # 1
         self._curTran.append(self._curHub.pos)
-        #print('Hub Pos:', self._curHub.pos)
-        
+        print('Hub Pos:', self._curHub.pos)
+
         # 2
-        self._curTran.append(self._curHub.e_pen.endType.candle_index)
-        #print('中枢确认K线:', self._curHub.e_pen.endType.candle_index)
-
-        # 3
         self._curTran.append(event._dict['len_cans'])
-        #print('建仓操作K线:', event._dict['len_cans'])
+        print('建仓操作K线:', event._dict['len_cans'])
 
-        self._curSize = self.position(event)
-
-        if self._curSize == 0:
-
-            self._curTran.append(0)
-            self._curTran.append(0)
-            self._curTran.append(0)
-            self._curTran.append(0)
-            self._curTran.append(0)
-            self._curTran.append(0)
-
-            self._entryPrice = 0
-
-            self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.k_gen)
-            print('illegal position')
-
-            return
+        # self._curSize = self.position(event)
+        #
+        # if self._curSize == 0:
+        #
+        #     self._curTran.append(0)
+        #     self._curTran.append(0)
+        #     self._curTran.append(0)
+        #     self._curTran.append(0)
+        #     self._curTran.append(0)
+        #     self._curTran.append(0)
+        #
+        #     self._entryPrice = 0
+        #
+        #     self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)
+        #     print('illegal position')
+        #
+        #     return
 
         #print('position size', self._curSize)
 
-        # 4
+        # 3
         self._curTran.append(self._curSize)
 
         if self._curHub.pos == 'Up':
@@ -360,30 +359,39 @@ class S2:
 
             self._rPrice = self._curHub.ZD
 
-        # 5 ZG
+        # 4 ZG
         self._curTran.append(self._curHub.ZG)
 
-        # 6 ZD
+        # 5 ZD
         self._curTran.append(self._curHub.ZD)
 
-        #print('ZG:', self._curHub.ZG, '  ZD:', self._curHub.ZD)
+        print('ZG:', self._curHub.ZG, '  ZD:', self._curHub.ZD)
 
-        # 7 理论价格 -- 中枢边界值
+        # 6 理论价格 -- 中枢边界值
         self._curTran.append(self._rPrice)
-        #print('Benchmark entry point(edge of hub):', self._rPrice)
+        print('Benchmark entry point(edge of hub):', self._rPrice)
 
-        # 8 理论最优价格 -- 中枢平均值
+        # 7 理论价格 -- 中枢平均值
         self._mPrice = (self._curHub.ZG + self._curHub.ZD) / 2
         self._curTran.append(self._mPrice)
-        #print('Benchmark entry point(mid of hub):', self._mPrice)
+        print('Benchmark entry point(mid of hub):', self._mPrice)
 
-        # 9
+        # 8
         self._curTran.append(self._entryPrice)
-        #print('actual entry point(current K close):', self._entryPrice)
+        print('actual entry point(current K close):', self._entryPrice)
 
-        #print('Hub ZG:', self._curHub.ZG, 'Hub ZD:', self._curHub.ZD)
+        self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)
 
-        self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.k_gen)
+        print('trend id', self._i)
+        print('###########################')
+
+        S2._trans.append(copy.deepcopy(self._curTran))
+
+        self._curTran.clear()
+
+        self._entryPrice = -1
+
+        self._i += 1
 
     def exit(self, event):
 
@@ -580,7 +588,9 @@ class S2:
 
         print('New Hub ID:', event._dict['hub_id'], '中枢确认K线:', hub_k_pos, '当下K线:', last_k_post)
 
-        self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.k_gen)
+        self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)
+
+        self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.fourPen)
 
         # 建仓和建仓应该保持相同条件
         # 在K线数量上满足操作条件 and 价格交集满足条件
@@ -622,7 +632,9 @@ class S2:
 
                     print('第四笔确认--笔末端K:', fourth_pen.endType.candle_index, '当下K:', last_k_post)
 
-                    self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.k_gen)
+                    self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.fourPen)
+
+                    self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.enter)
 
                     return True
 
@@ -701,6 +713,44 @@ class S2:
 
             return False
 
+    # 识别中枢中点建仓逻辑
+    def midCross(self, event):
+
+        curHub = event._dict['hub']
+
+        curCandle = event._dict['can']
+
+        close = curCandle.getClose()
+
+        try:
+
+            mid = (curHub.ZD + curHub.ZG) / 2
+
+        except KeyError:
+
+            return False
+
+        if curHub.pos == 'Up' and mid <= close <= curHub.ZG:
+
+            cross = True
+
+            s = 'Cross meet mid <= close <= curHub.ZG' + repr(mid) + ',' + repr(close) + ',' + repr(curHub.ZG)
+
+            print(s)
+
+        elif curHub.pos == 'Down' and curHub.ZD <= close <= mid:
+
+            s = 'Cross meet curHub.ZD <= close <= mid' + repr(curHub.ZD) + ',' + repr(close) + ',' + repr(mid)
+
+            print(s)
+
+            cross = True
+
+        else:
+
+            cross = False
+
+        return cross
 
 class Tran:
 
