@@ -454,7 +454,7 @@ class Ten_Min_Candle_Container(Candle_Container):
 
                 pass
 
-            monitor.e.put(can)
+            monitor._e.put(can)
 
             sleep(0.002)
 
@@ -472,24 +472,24 @@ class Ten_Min_Candle_Container(Candle_Container):
                 try:
 
                     # 当下中枢ID 
-                    born.dict['hub_id'] = len(hubs.container) - 1
+                    born._dict['hub_id'] = len(hubs.container) - 1
 
                     # 当下K线
-                    born.dict['can'] = self.container[len(self.container) - 1]
+                    born._dict['can'] = self.container[len(self.container) - 1]
 
                     # 当下K线队列长度
-                    born.dict['len_cans'] = len(self.container) - 1
+                    born._dict['len_cans'] = len(self.container) - 1
 
                     # 用于交易信息的传递
                     # 当下中枢
-                    born.dict['hub'] = hubs.container[len(hubs.container) - 1]
-                    born.dict['pre'] = hubs.container[len(hubs.container) - 2]
+                    born._dict['hub'] = hubs.container[len(hubs.container) - 1]
+                    born._dict['pre'] = hubs.container[len(hubs.container) - 2]
 
                 except KeyError:
 
                     pass
 
-                monitor.e.put(born)
+                monitor._e.put(born)
 
                 sleep(0.002)
 

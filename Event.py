@@ -82,7 +82,7 @@ class EventEngine(object):
         if handler not in handlerList:
             handlerList.append(handler)
 
-        #print('Registration', type_, handler)
+        print('Register', type_, handler)
 
     #----------------------------------------------------------------------
     def unregister(self, type_, handler):
@@ -99,7 +99,7 @@ class EventEngine(object):
             if not handlerList:
                 del self.__handlers[type_]
 
-            #print('Unregistration', type_, handler)
+            print('Deregister', type_, handler)
 
         except KeyError:
             pass
@@ -159,7 +159,7 @@ class Monitor:
     # 中枢生成事件处理接口
     def hub_gen(self, event):
 
-        self._s.hub_born(event)
+        self._s.hub_gen(event)
 
 
     # 中枢终结事件处理接口
@@ -190,7 +190,9 @@ class Monitor:
     # 此接口的重要作用在于对当下形成的K线进行监听，根据一定的策略来进行买卖操作
     def k_gen(self, event):
 
-         self._s.isTrade(event) 
+         # self._s.isTrade(event)
+
+        self._s.fourPen(event)
 
     def genEvent(self, event):
 

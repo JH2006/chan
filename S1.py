@@ -383,7 +383,7 @@ class S2:
 
         #print('Hub ZG:', self._curHub.ZG, 'Hub ZD:', self._curHub.ZD)
 
-        self.monitor.e.unregister(Event.Monitor.K_GEN, self._monitor.k_gen)
+        self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.k_gen)
 
     def exit(self, event):
 
@@ -534,7 +534,7 @@ class S2:
     # 新中枢生成相应接口
     # 新中枢生成都是上一次交易的清仓时机
     # 新中枢生成也是新交易建仓时机
-    def hub_born(self, event):
+    def hub_gen(self, event):
 
         curHub = event._dict['hub']
 
@@ -580,7 +580,7 @@ class S2:
 
         print('New Hub ID:', event._dict['hub_id'], '中枢确认K线:', hub_k_pos, '当下K线:', last_k_post)
 
-        self.monitor.e.register(Event.Monitor.K_GEN, self._monitor.k_gen)
+        self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.k_gen)
 
         # 建仓和建仓应该保持相同条件
         # 在K线数量上满足操作条件 and 价格交集满足条件
@@ -596,14 +596,21 @@ class S2:
         #     # 复位交易指示器
         #     self._isTraded = False
 
-
     def fourPen(self, event):
 
         hub = event._dict['hub']
         pens = event._dict['pens']
+        last_k_post = event._dict['len_cans']
 
         first_pen_index = hub.s_pen_index
-        third_pen = pens[first_pen_index + 2]
+
+        try:
+
+            third_pen = pens[first_pen_index + 2]
+
+        except IndexError:
+
+            return False
 
         if third_pen.legal():
 
@@ -611,7 +618,17 @@ class S2:
 
                 fourth_pen = pens[first_pen_index + 3]
 
-                return fourth_pen.legal()
+                if fourth_pen.legal():
+
+                    print('第四笔确认--笔末端K:', fourth_pen.endType.candle_index, '当下K:', last_k_post)
+
+                    self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.k_gen)
+
+                    return True
+
+                else:
+
+                    return False
 
             except IndexError:
 
