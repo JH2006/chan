@@ -90,7 +90,7 @@ def test_markets(markets, years):
 
 def test_month_10(market, year, month, count=0, skips=0):
 
-    candles = Currency.CAD_Ten_Min_Candle_Container()
+    candles = Currency.AUD_Ten_Min_Candle_Container()
 
     types = Hunter.Type_Container(candles)
 
@@ -235,20 +235,20 @@ def test_years(market, year_1, year_2):
 
 if __name__ == '__main__':
 
-    test_month_10('', 2005, 2)
+    # test_month_10('', 2005, 2)
 
-    #for i in range(2005, 2006):
-    #    test_year(i, 1, 12)
+    for i in range(2005, 2016):
+       test_year(i, 1, 12)
 
-    #df_2 = pd.DataFrame(S1.S2._trans)
+    df_2 = pd.DataFrame(S1.S2._trans)
 
-    #file = 'CAD.xlsx'
+    file = 'AUD.xlsx'
 
-    #writer = pd.ExcelWriter(file, engine='xlsxwriter')
+    writer = pd.ExcelWriter(file, engine='xlsxwriter')
 
-    #df_2.to_excel(writer)
+    df_2.to_excel(writer)
 
-    #writer.close()
+    writer.close()
 
     S1.S2._trans.clear()
    
