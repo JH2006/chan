@@ -891,8 +891,6 @@ class Pen_Container():
 
         s = False
 
-        # 由于存在向前延伸的行为,数组遍历最大仅能到倒数第二个
-
         # 2016-07-20
         # 代码优化删除了仅能处理到倒数第二个分型的约束
         for j in range(self.types_index, self.__types.size()):
@@ -907,6 +905,7 @@ class Pen_Container():
                     # 记录最后满足条件的信息
                     cur_high = self.__types.container[j].candle.getHigh()
                     self.types_index = j
+
                     s = True
 
         if s:
@@ -924,8 +923,6 @@ class Pen_Container():
 
         s = False
 
-        # 由于存在向前延伸的行为,分形数组遍历最大仅能到倒数第二个
-
         # 2016-07-20
         # 代码优化删除了仅能处理到倒数第二个分型的约束
         for j in range(self.types_index, self.__types.size()):
@@ -939,6 +936,7 @@ class Pen_Container():
                     # 记录最后满足条件的信息
                     cur_low = self.__types.container[j].candle.getLow()
                     self.types_index = j
+
                     s = True
 
         if s:
@@ -1439,7 +1437,7 @@ class Hub_Container:
             else:
 
                 # 从离最后一个中枢最近的不属于任何中枢的笔开始遍历
-                cur_pen_index = self.last_hub_end_pen_index + 1
+                cur_pen_index = self.last_hub_end_pen_index
 
                 # 2016-04-11
                 # 修改_pen.pens_index - 3指示中枢可以延迟3笔生成
@@ -1640,7 +1638,6 @@ class Hub_Container:
         h = []
         l = []
 
-        # 偏置位从1开始,其实是避开了第一个K线.理论上第一个K线不属于中枢
         # 注意遍历的范围为width+1而不是width
         for i in range(0, self.hub_width + 1):
             h.append(self.pens.container[i + index].high)
