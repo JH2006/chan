@@ -445,10 +445,10 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             try:
 
-                can._dict['can'] = self.container[len(self.container) - 1]
+                can._dict['K'] = self.container[len(self.container) - 1]
                 can._dict['len_cans'] = len(self.container) - 1
-                can._dict['hub'] = hubs.container[len(hubs.container) - 1]
-                can._dict['pens'] = pens.container
+                can._dict['HUB'] = hubs.container[len(hubs.container) - 1]
+                can._dict['PENS'] = pens.container
 
             except IndexError:
 
@@ -475,15 +475,14 @@ class Ten_Min_Candle_Container(Candle_Container):
                     born._dict['hub_id'] = len(hubs.container) - 1
 
                     # 当下K线
-                    born._dict['can'] = self.container[len(self.container) - 1]
+                    born._dict['K'] = self.container[len(self.container) - 1]
 
                     # 当下K线队列长度
                     born._dict['len_cans'] = len(self.container) - 1
 
                     # 用于交易信息的传递
                     # 当下中枢
-                    born._dict['hub'] = hubs.container[len(hubs.container) - 1]
-                    born._dict['pre'] = hubs.container[len(hubs.container) - 2]
+                    born._dict['HUB'] = hubs.container[len(hubs.container) - 1]
 
                 except KeyError:
 
