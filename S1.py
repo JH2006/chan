@@ -250,9 +250,11 @@ class S2:
 
     def __init__(self):
 
+        # 交易记录存储
+        # Key: id
         self._trans = {}
 
-        # 交易编码(用于调试)
+        # 交易编码
         self._id = 0
 
         # 当下中枢
@@ -270,19 +272,18 @@ class S2:
 
         # 是否交易已经发生
         # 当前中枢如果发生了交易就设置为True
-        self._isTraded = False
+        # self._isTraded = False
 
         self._eTran = None
         self._xTran = None
 
-        # Entries实体
+        # Entries实体队列
         self._entries = {}
 
-        # Exit实体
+        # Exit实体队列
         self._exits = {}
 
-        self._stops = {}
-
+        # 接口调用初始化建仓策略
         self.loadEntry()
 
     # 2016-07-30
@@ -314,7 +315,15 @@ class S2:
 
         except KeyError:
 
-            self._eTran = Component.Tran(self._id)
+            if self._curHub.pos == 'Up':
+
+                p = 'SHORT'
+
+            else:
+
+                p = 'LONG'
+
+            self._eTran = Component.Tran(self._id, p)
 
         event._dict['TRAN'] = self._eTran
 
@@ -328,6 +337,14 @@ class S2:
                 print('成交价:', self._eTran._entries[name][0])
                 print('中枢高点:', self._curHub.ZG, ' 中枢低点:', self._curHub.ZD,'  中枢方向:', self._curHub.pos)
                 print('###########################')
+
+                try:
+
+                    t = self._trans[self._id]
+
+                except KeyError:
+
+                    self._trans[self._id] = self._eTran
 
 
     def exit(self, event):
@@ -580,6 +597,14 @@ class S2:
             except IndexError:
 
                 return False
+
+    def __del__(self):
+
+        self._trans.clear()
+
+        self._entries.clear()
+
+        self._exits.clear()
 
 
 

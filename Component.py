@@ -184,10 +184,18 @@ class Exits:
 
 class Tran:
 
-    def __init__(self, id):
+    def __init__(self, id, p):
 
         self._id = id
+
+        # long or short
+        self._placement = p
 
         self._entries = {}
 
         self._exits = {}
+
+    def __del__(self):
+
+        self._entries.clear()
+        self._exits.clear()
