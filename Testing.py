@@ -90,7 +90,7 @@ def test_markets(markets, years):
 
 def test_month_10(market, year, month, count=0, skips=0):
 
-    candles = Currency.CAD_Ten_Min_Candle_Container()
+    candles = Currency.AUD_Ten_Min_Candle_Container()
 
     types = Hunter.Type_Container(candles)
 
@@ -249,6 +249,3 @@ if __name__ == '__main__':
     #df_2.to_excel(writer)
 
     #writer.close()
-
-    S1.S2._trans.clear()
-   

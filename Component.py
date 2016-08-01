@@ -5,6 +5,8 @@
 
 class Entries:
 
+    _type = 'ENTRY'
+
     def __init__(self, position):
 
         self._position = position
@@ -78,7 +80,7 @@ class MidEntry(Entries):
                 k = event._dict['K']
                 point = k.getClose()
 
-                tran._trans[MidEntry._name] = (point, self._position)
+                tran._entries[MidEntry._name] = (point, self._position)
 
                 self._ordered = True
 
@@ -156,29 +158,13 @@ class EdgeEntry(Entries):
                 k = event._dict['K']
                 point = k.getClose()
 
-                tran._trans[EdgeEntry._name] = (point, self._position)
+                tran._entries[EdgeEntry._name] = (point, self._position)
 
                 self._ordered = True
 
                 return True
 
         return False
-
-
-class Stops:
-
-    def __init__(self):
-
-        pass
-
-    def signaling(self):
-
-        pass
-
-    def order(self):
-
-        pass
-
 
 
 class Exits:
@@ -202,4 +188,6 @@ class Tran:
 
         self._id = id
 
-        self._trans = {}
+        self._entries = {}
+
+        self._exits = {}

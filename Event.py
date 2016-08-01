@@ -184,9 +184,9 @@ class Monitor:
         pass
 
     # 跟踪中枢第四笔确认点
-    def fourPen(self, event):
+    def tradeCommit(self, event):
 
-        self._s.fourPen(event)
+        self._s.tradeCommit(event)
 
     def genEvent(self, event):
 

@@ -323,9 +323,9 @@ class S2:
             if self._entries[name].order(event):
 
                 print('###########################')
-                print('Tran ID:', self._id)
+                print('Tran ID:', self._eTran._id)
                 print('建仓类型:', name, '  建仓K线:', event._dict['len_cans'])
-                print('成交价:', self._eTran._trans[name][0])
+                print('成交价:', self._eTran._entries[name][0])
                 print('中枢高点:', self._curHub.ZG, ' 中枢低点:', self._curHub.ZD,'  中枢方向:', self._curHub.pos)
                 print('###########################')
 
@@ -532,11 +532,15 @@ class S2:
 
             self._entries[name]._ordered = False
 
+        # 关闭建仓处理
         self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)
 
-        self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.fourPen)
+        self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.tradeCommit)
 
-    def fourPen(self, event):
+    # 2016-08-01
+    # 对中枢确认的辅助条件,根据具体认为的情况设定
+    # 当前为确认中枢临时第4笔
+    def tradeCommit(self, event):
 
         hub = event._dict['HUB']
         pens = event._dict['PENS']
@@ -562,8 +566,9 @@ class S2:
 
                     print('第四笔确认--笔末端K:', fourth_pen.endType.candle_index, '当下K:', last_k_post)
 
-                    self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.fourPen)
+                    self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.tradeCommit)
 
+                    # 启动建仓处理
                     self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.enter)
 
                     return True
