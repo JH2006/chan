@@ -12,9 +12,6 @@ class Entries:
 
         self._position = position
 
-        # 标示指示每个策略仅执行一次
-        self._ordered = False
-
     def signaling(self, event):
 
         pass
@@ -72,18 +69,17 @@ class MidEntry(Entries):
 
     def order(self, event):
 
-        if not self._ordered:
+        if self.signaling(event):
 
-            if self.signaling(event):
+            tran = event._dict['TRAN']
 
-                tran = event._dict['TRAN']
+            # 通过Key确保每个策略仅执行一次
+            if not tran._entries.has_key(MidEntry._name):
 
                 k = event._dict['K']
                 point = k.getClose()
 
                 tran._entries[MidEntry._name] = (point, self._position)
-
-                self._ordered = True
 
                 return True
 
@@ -150,18 +146,16 @@ class EdgeEntry(Entries):
 
     def order(self, event):
 
-        if not self._ordered:
+        if self.signaling(event):
 
-            if self.signaling(event):
+            tran = event._dict['TRAN']
 
-                tran = event._dict['TRAN']
+            # 通过Key确保每个策略仅执行一次
+            if not tran._entries.has_key(EdgeEntry._name):
 
                 k = event._dict['K']
                 point = k.getClose()
-
                 tran._entries[EdgeEntry._name] = (point, self._position)
-
-                self._ordered = True
 
                 return True
 
@@ -175,8 +169,6 @@ class Exits:
     def __init__(self, position):
 
         self._position = position
-
-        self._ordered = False
 
     def signaling(self, event):
 
@@ -202,11 +194,11 @@ class StopExit(Exits):
 
     def order(self, event):
 
-        if not self._ordered:
+        if self.signaling(event):
 
-            if self.signaling(event):
+            tran = event._dict['TRAN']
 
-                tran = event._dict['TRAN']
+            if len(tran._entries) != 0:
 
                 k = event._dict['K']
                 point = k.getClose()
@@ -215,25 +207,12 @@ class StopExit(Exits):
                 s[StopExit._name] = (copy.deepcopy(tran._entries), point)
 
                 tran._stops.append(s)
-
-                self._ordered = True
-
-                self.reset(event)
+                tran._entries.clear()
 
                 return True
 
-    def reset(self, event):
+        return False
 
-        entries = event._dict['ENTRY']
-
-        tran = event._dict['TRAN']
-
-        # 复位交易标识
-        for name in entries:
-            entries[name]._ordered = False
-
-        # 清空已有建仓记录
-        tran._entries.clear()
 
 class MidExit(Exits):
 
@@ -283,18 +262,17 @@ class MidExit(Exits):
 
     def order(self, event):
 
-        if not self._ordered:
+        if self.signaling(event):
 
-            if self.signaling(event):
+            tran = event._dict['TRAN']
 
-                tran = event._dict['TRAN']
+            # 通过Key确保每个策略仅执行一次
+            if not tran._exits.has_value(MidExit._name):
 
                 k = event._dict['K']
                 point = k.getClose()
 
                 tran._exits[MidExit._name] = (point, self._position)
-
-                self._ordered = True
 
                 return True
 
@@ -359,6 +337,29 @@ class EdgeExit(Exits):
 
             return False
 
+    def order(self, event):
+
+        if self.signaling(event):
+
+            tran = event._dict['TRAN']
+
+            # 通过Key确保每个策略仅执行一次
+            if not tran._exits.has_value(EdgeExit._name):
+
+                k = event._dict['K']
+                point = k.getClose()
+
+                tran._exits[EdgeExit._name] = (point, self._position)
+
+                # 首先触碰中枢边界，100%平仓
+                if not tran._exits.has_value(MidExit._name):
+
+                    tran._exits[MidExit._name] = (point, self._position)
+
+                return True
+
+        return False
+
 class Tran:
 
     def __init__(self, id, p):
@@ -373,10 +374,9 @@ class Tran:
         # 平仓交易记录
         self._exits = {}
         # 止损交易记录
-        self._stops =[]
+        self._stops = []
 
     def __del__(self):
-
         self._entries.clear()
         self._exits.clear()
         self._stops.clear()
