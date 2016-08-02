@@ -74,7 +74,7 @@ class MidEntry(Entries):
             tran = event._dict['TRAN']
 
             # 通过Key确保每个策略仅执行一次
-            if not tran._entries.has_key(MidEntry._name):
+            if MidEntry._name not in tran._entries:
 
                 k = event._dict['K']
                 point = k.getClose()
@@ -151,7 +151,7 @@ class EdgeEntry(Entries):
             tran = event._dict['TRAN']
 
             # 通过Key确保每个策略仅执行一次
-            if not tran._entries.has_key(EdgeEntry._name):
+            if EdgeEntry._name not in tran._entries:
 
                 k = event._dict['K']
                 point = k.getClose()
@@ -267,7 +267,7 @@ class MidExit(Exits):
             tran = event._dict['TRAN']
 
             # 通过Key确保每个策略仅执行一次
-            if not tran._exits.has_value(MidExit._name):
+            if MidExit._name not in tran._exits:
 
                 k = event._dict['K']
                 point = k.getClose()
@@ -344,7 +344,7 @@ class EdgeExit(Exits):
             tran = event._dict['TRAN']
 
             # 通过Key确保每个策略仅执行一次
-            if not tran._exits.has_value(EdgeExit._name):
+            if EdgeExit._name not in tran._exits:
 
                 k = event._dict['K']
                 point = k.getClose()
@@ -352,13 +352,14 @@ class EdgeExit(Exits):
                 tran._exits[EdgeExit._name] = (point, self._position)
 
                 # 首先触碰中枢边界，100%平仓
-                if not tran._exits.has_value(MidExit._name):
+                if MidExit._name not in tran._exits:
 
                     tran._exits[MidExit._name] = (point, self._position)
 
                 return True
 
         return False
+
 
 class Tran:
 

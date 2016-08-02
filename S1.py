@@ -313,59 +313,44 @@ class S2:
 
     def enter(self, event):
 
-        try:
-
-            self._curHub = event._dict['HUB']
-
-        except KeyError:
-
-            print('中枢访问越界')
-            return
+        hub = event._dict['HUB']
 
         # 第一个中枢不操作
-        if self._curHub.pos == '--':
+        if hub.pos == '--':
             return
 
         # 建仓记录总数与注册的建仓策略数相同，说明平仓完全执行，直接退出
         if len(self._eTran._entries) == len(self._entries):
             return
 
+        # 新中枢的第一个建仓记录
+        if self._eTran is None:
+
+            if hub.pos == 'Up':
+
+                p = 'SHORT'
+
+            else:
+
+                p = 'LONG'
+
+            self._eTran = Component.Tran(self._id, p)
+
+        event._dict['TRAN'] = self._eTran
+
         for name in self._entries:
 
             if self._entries[name].order(event):
-
-                try:
-
-                    self._eTran = self._trans[self._id]
-
-                # 第一次访问交易实体会抛出异常处理
-                except KeyError:
-
-                    if self._curHub.pos == 'Up':
-
-                        p = 'SHORT'
-
-                    else:
-
-                        p = 'LONG'
-
-                    self._eTran = Component.Tran(self._id, p)
-
-                event._dict['TRAN'] = self._eTran
 
                 print('###########################')
                 print('Tran ID:', self._eTran._id)
                 print('建仓类型:', name, '  建仓K线:', event._dict['LENOFK'])
                 print('成交价:', self._eTran._entries[name][0])
-                print('中枢高点:', self._curHub.ZG, ' 中枢低点:', self._curHub.ZD, '  中枢方向:', self._curHub.pos)
+                print('中枢高点:', hub.ZG, ' 中枢低点:', hub.ZD, '  中枢方向:', hub.pos)
                 print('###########################')
 
-                # 一旦建仓交易触发，则保持交易
-                try:
-
-                    t = self._trans[self._id]
-
-                except KeyError:
+                # 一旦建仓交易触发，则保存交易记录
+                if self._id not in self._trans:
 
                     # 新赋值,新交易生成
                     # 留意：可能需要硬copy，否则引用可能会错
@@ -376,25 +361,18 @@ class S2:
 
     def exit(self, event):
 
-        try:
-
-            self._curHub = event._dict['HUB']
-
-        except KeyError:
-
-            print('Strategy--exit() 中枢访问越界')
-            return
-
-        # 第一个中枢不操作
-        if self._curHub.pos == '--':
-            return
-
         # 仓位为空，或者没有形成建仓条件，或者已经被止损平仓，没有继续平仓需求，直接退出
         if len(self._xTran._entries) == 0:
             return
 
         # 平仓记录总数与注册的平仓策略数相同，说明平仓完全执行，直接退出
         if len(self._xTran._exits) == len(self._exits):
+            return
+
+        hub = event._dict['HUB']
+
+        # 第一个中枢不操作
+        if hub.pos == '--':
             return
 
         event._dict['TRAN'] = self._xTran
@@ -407,13 +385,26 @@ class S2:
                 print('Tran ID:', self._xTran._id)
                 print('平仓类型:', name, '  平仓K线:', event._dict['LENOFK'])
                 print('成交价:', self._xTran.exits[name][0])
-                print('中枢高点:', self._curHub.ZG, ' 中枢低点:', self._curHub.ZD, '  中枢方向:', self._curHub.pos)
+                print('中枢高点:', hub.ZG, ' 中枢低点:', hub.ZD, '  中枢方向:', hub.pos)
                 print('###########################')
 
     def stop(self, event):
 
         # 仓位为空，或者没有形成建仓条件，或者已经被止损平仓，没有继续止损需求，直接退出
         if len(self._eTran._entries) == 0:
+            return
+
+        try:
+
+            hub = event._dict['HUB']
+
+        except KeyError:
+
+            print('Strategy--exit() 中枢访问越界')
+            return
+
+        # 第一个中枢不操作
+        if hub.pos == '--':
             return
 
         # 当下的交易
@@ -426,7 +417,7 @@ class S2:
                 print('Tran ID:', self._eTran._id)
                 print('止损类型:', name, '  止损K线:', event._dict['LENOFK'])
                 print('止损价:', self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1])
-                print('中枢高点:', self._curHub.ZG, ' 中枢低点:', self._curHub.ZD, '  中枢方向:', self._curHub.pos)
+                print('中枢高点:', hub.ZG, ' 中枢低点:', hub.ZD, '  中枢方向:', hub.pos)
                 print('###########################')
 
     def position(self, event):
@@ -524,16 +515,18 @@ class S2:
         # 注册中枢确认附件条件处理
         self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.tradeCommit)
 
-        try:
+
+        if self._eTran is not None:
+
+            self._trans[self._id] = self._eTran
+
             self._xTran = self._trans[self._id]
+
+            self._eTran = None
 
             # 注册平仓策略
             # 平仓操作可早于建仓启动
             self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.exit)
-
-        except KeyError:
-
-            pass
 
         self._id += 1
 
