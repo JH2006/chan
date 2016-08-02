@@ -198,4 +198,8 @@ class Monitor:
 
     def exit(self, event):
 
-        self._s.isExit(event)
+        self._s.exit(event)
+
+    def stop(self, event):
+
+        self._e.stop(event)

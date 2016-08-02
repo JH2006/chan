@@ -446,7 +446,7 @@ class Ten_Min_Candle_Container(Candle_Container):
             try:
 
                 can._dict['K'] = self.container[len(self.container) - 1]
-                can._dict['len_cans'] = len(self.container) - 1
+                can._dict['LENOFK'] = len(self.container) - 1
                 can._dict['HUB'] = hubs.container[len(hubs.container) - 1]
                 can._dict['PENS'] = pens.container
 
@@ -478,7 +478,7 @@ class Ten_Min_Candle_Container(Candle_Container):
                     born._dict['K'] = self.container[len(self.container) - 1]
 
                     # 当下K线队列长度
-                    born._dict['len_cans'] = len(self.container) - 1
+                    born._dict['LENOFK'] = len(self.container) - 1
 
                     # 用于交易信息的传递
                     # 当下中枢

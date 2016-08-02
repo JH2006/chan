@@ -274,7 +274,9 @@ class S2:
         # 当前中枢如果发生了交易就设置为True
         # self._isTraded = False
 
+        # 代表当下交易
         self._eTran = None
+        # 代表前一交易
         self._xTran = None
 
         # Entries实体队列
@@ -283,8 +285,13 @@ class S2:
         # Exit实体队列
         self._exits = {}
 
+        # 止损实体
+        self._stops = {}
+
         # 接口调用初始化建仓策略
         self.loadEntry()
+        self.loadExit()
+        self.loadStop()
 
     # 2016-07-30
     # 根据具体的策略要求组合不同的Entry
@@ -293,6 +300,16 @@ class S2:
         self._entries[Component.MidEntry._name] = Component.MidEntry(0.5)
 
         self._entries[Component.EdgeEntry._name] = Component.EdgeEntry(0.5)
+
+    def loadExit(self):
+
+        self._exits[Component.MidExit._name] = Component.MidExit(0.5)
+
+        self._exits[Component.EdgeExit._name] = Component.EdgeExit(1)
+
+    def loadStop(self):
+
+        self._stops[Component.StopExit._name] = Component.StopExit(1)
 
     def enter(self, event):
 
@@ -313,6 +330,7 @@ class S2:
 
             self._eTran = self._trans[self._id]
 
+        # 第一次访问交易实体会抛出异常处理
         except KeyError:
 
             if self._curHub.pos == 'Up':
@@ -333,128 +351,77 @@ class S2:
 
                 print('###########################')
                 print('Tran ID:', self._eTran._id)
-                print('建仓类型:', name, '  建仓K线:', event._dict['len_cans'])
+                print('建仓类型:', name, '  建仓K线:', event._dict['LENOFK'])
                 print('成交价:', self._eTran._entries[name][0])
                 print('中枢高点:', self._curHub.ZG, ' 中枢低点:', self._curHub.ZD,'  中枢方向:', self._curHub.pos)
                 print('###########################')
 
+                # 一旦建仓交易触发，则保持交易
                 try:
 
                     t = self._trans[self._id]
 
                 except KeyError:
 
+                    # 新赋值,新交易生成
+                    # 留意：可能需要硬copy，否则引用可能会错
                     self._trans[self._id] = self._eTran
 
+                    for s in self._stops.values():
+                        s._ordered = False
+
+                    # 新交易的出现伴随止损策略注册
+                    self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.stop)
 
     def exit(self, event):
 
-        if self._entryPrice == -1:
+        try:
 
+            self._curHub = event._dict['HUB']
+
+        except KeyError:
+
+            print('Strategy--exit() 中枢访问越界')
             return
 
-        if self._entryPrice == 0:
-
-            self._curTran.append(0)
-            self._curTran.append(0)
-            self._curTran.append(0)
-            self._curTran.append(0)
-            self._curTran.append(0)
-            self._curTran.append(0)
-            self._curTran.append(0)
-            self._curTran.append(0)
-            self._curTran.append(0)
-
-            S2._trans.append(copy.deepcopy(self._curTran))
-
-            self._curTran.clear()
-
-            self._entryPrice = -1
-
-            self._i += 1
-
+        # 第一个中枢不操作
+        if self._curHub.pos == '--':
             return
 
-        curHub = event._dict['hub']
+        try:
 
-        if curHub.pos == 'Up':
+            t = self._xTran._entries
 
-            ePrice = curHub.ZD
+        event._dict['TRAN'] = self._xTran
 
-        else:
+        for name in self._exits:
 
-            ePrice = curHub.ZG
-        
-        mPrice = (curHub.ZG + curHub.ZD) / 2
+            if self._exits[name].order(event):
 
-        lastCandle = event._dict['K']
+                print('###########################')
+                print('Tran ID:', self._xTran._id)
+                print('平仓类型:', name, '  平仓K线:', event._dict['LENOFK'])
+                print('成交价:', self._xTran.exits[name][0])
+                print('中枢高点:', self._curHub.ZG, ' 中枢低点:', self._curHub.ZD, '  中枢方向:', self._curHub.pos)
+                print('###########################')
 
-        exitP = lastCandle.getClose()
+    def stop(self, event):
 
-        #print('Pre Hub.Pos:', self._curHub.pos)
-        #print('Current Hub Pos:', curHub.pos)
+        # 当下的交易
+        event._dict['TRAN'] = self._eTran
 
-        # 1
-        #print('中枢确认K线:', curHub.e_pen.endType.candle_index)
-        self._curTran.append(curHub.e_pen.endType.candle_index)
+        # 止损操作会修改会完成的建仓状态
+        event._dict['ENTRY'] = self._entries
 
-        # 2
-        #print('平仓操作K线:', event._dict['len_cans'])
-        self._curTran.append(event._dict['len_cans'])
+        for name in self._stops:
 
-        # 3
-        self._curTran.append(curHub.ZG)
-
-        # 4
-        self._curTran.append(curHub.ZD)
-
-        #print('ZG:', self._curHub.ZG, '  ZD:', self._curHub.ZD)
-
-        # 5
-        #print('Benchmark Exit point(edge of hub):', ePrice)
-        self._curTran.append(ePrice)
-        
-        # 6
-        #print('Benchmakr Exit point(mid of hub ):', mPrice)
-        self._curTran.append(mPrice)
-
-        # 7
-        self._curTran.append(exitP)
-        #print('practical exit point(current K close):', exitP)
-
-        if self._curHub.pos == 'Up':
-
-            profit_1 = self._mPrice/mPrice - 1 
-            profit_2 = self._entryPrice/exitP - 1
-            
-        else:
-             
-            profit_1 = mPrice/self._mPrice - 1
-            profit_2 = exitP/self._entryPrice - 1  
-                 
-        # 8
-        self._curTran.append(profit_1)
-        #print('理论获利:', profit_1)
-
-        # 9
-        self._curTran.append(profit_2)
-        #print('实际获利:', profit_2)
-
-        #print('trend id', self._i)
-        #print('###########################')
-
-        S2._trans.append(copy.deepcopy(self._curTran))
-
-        self._curTran.clear()
-
-        self._entryPrice = -1
-
-        self._i += 1
-
-        # 一笔交易完成，保存可交易的当前中枢准备用于趋势计算
-        # 注：不能形成交易的中枢不统计
-        self._preHub = None
-        self._preHub = copy.deepcopy(self._curHub)
+            if self._stops[name].order(event):
+                print('###########################')
+                print('Tran ID:', self._eTran._id)
+                print('止损类型:', name, '  止损K线:', event._dict['LENOFK'])
+                print('止损价:', self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1])
+                print('中枢高点:', self._curHub.ZG, ' 中枢低点:', self._curHub.ZD,'  中枢方向:', self._curHub.pos)
+                print('###########################')
 
     def position(self, event):
 
@@ -500,8 +467,6 @@ class S2:
 
         curHub = event._dict['HUB']
 
-        self._id += 1
-
         # 每次产生新中枢的时候都对上一个中枢是否有发生交易做判断
         # if not self._isTraded:
         #
@@ -540,19 +505,40 @@ class S2:
         #         pass
 
         hub_k_pos = curHub.e_pen.endType.candle_index
-        last_k_post = event._dict['len_cans']
+        last_k_post = event._dict['LENOFK']
 
         print('新中枢ID:', event._dict['hub_id'], '中枢确认K线:', hub_k_pos, '当下K线:', last_k_post)
 
-        # 初始化所有Entry实体的交易状态为False,启动新一轮的交易
+        # 初始化所有交易实体的交易状态为False,启动新一轮的交易
         for name in self._entries:
 
             self._entries[name]._ordered = False
 
+        for name in self._exits:
+
+            self._exits[name]._ordered = False
+
         # 关闭建仓处理
         self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)
 
+        # 关闭止损处理
+        self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.stop)
+
+        # 注册中枢确认附件条件
         self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.tradeCommit)
+
+        try:
+            self._xTran = self._trans[self._id]
+
+            # 注册平仓策略
+            # 平仓操作可早于建仓启动
+            self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.exit)
+
+        except KeyError:
+
+            pass
+
+        self._id += 1
 
     # 2016-08-01
     # 对中枢确认的辅助条件,根据具体认为的情况设定
@@ -561,7 +547,7 @@ class S2:
 
         hub = event._dict['HUB']
         pens = event._dict['PENS']
-        last_k_post = event._dict['len_cans']
+        last_k_post = event._dict['LENOFK']
 
         first_pen_index = hub.s_pen_index
 
@@ -583,9 +569,10 @@ class S2:
 
                     print('第四笔确认--笔末端K:', fourth_pen.endType.candle_index, '当下K:', last_k_post)
 
+                    # 去激活中枢附件判决条件
                     self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.tradeCommit)
 
-                    # 启动建仓处理
+                    # 注册建仓策略处理
                     self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.enter)
 
                     return True
@@ -605,6 +592,8 @@ class S2:
         self._entries.clear()
 
         self._exits.clear()
+
+        self._stops.clear()
 
 
 
