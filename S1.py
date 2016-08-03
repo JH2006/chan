@@ -305,7 +305,7 @@ class S2:
 
         self._exits[Component.MidExit._name] = Component.MidExit(0.5)
 
-        self._exits[Component.EdgeExit._name] = Component.EdgeExit(1)
+        self._exits[Component.EdgeExit._name] = Component.EdgeExit(0.5)
 
     def loadStop(self):
 
@@ -346,12 +346,7 @@ class S2:
 
             if self._entries[name].order(event):
 
-                print('###########################')
-                print('Tran ID:', self._eTran._id)
-                print('建仓类型:', name, '  建仓K线:', event._dict['LENOFK'])
-                print('成交价:', self._eTran._entries[name][0])
-                print('中枢高点:', hub.ZG, ' 中枢低点:', hub.ZD, '  中枢方向:', hub.pos)
-                print('###########################')
+                print('Tran ID:', self._eTran._id, ' 建仓类型:', name, ' 成交价:', self._eTran._entries[name][0], '  建仓K线:', event._dict['LENOFK'])
 
                 # 新交易的出现伴随止损策略注册
                 # self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.stop)
@@ -374,12 +369,24 @@ class S2:
 
             if self._exits[name].order(event):
 
-                print('###########################')
-                print('Tran ID:', self._xTran._id)
-                print('平仓类型:', name, '  平仓K线:', event._dict['LENOFK'])
-                print('成交价:', self._xTran._exits[name][0])
-                print('中枢高点:', hub.ZG, ' 中枢低点:', hub.ZD, '  中枢方向:', hub.pos)
-                print('###########################')
+                print('Tran ID:', self._xTran._id, ' 平仓类型:', name, ' 成交价:', self._xTran._exits[name][0], '  平仓K线:', event._dict['LENOFK'])
+
+                if __debug__:
+
+                    if len(self._xTran._exits) == len(self._exits):
+
+                        print('***********************')
+                        print('Tran ID:', self._xTran._id, ' 完成!!!')
+
+                        for name in self._xTran._entries:
+
+                            print('建仓类型:', name, ' 成交价:', self._xTran._entries[name][0], ' 仓位:', self._xTran._entries[name][1])
+
+                        for name in self._xTran._exits:
+
+                            print('平仓类型:', name, ' 成交价:', self._xTran._exits[name][0], ' 仓位:', self._xTran._exits[name][1])
+
+                        print('***********************')
 
     def stop(self, event):
 

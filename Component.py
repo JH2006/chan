@@ -57,9 +57,9 @@ class MidEntry(Entries):
 
             cross = True
 
-            s = 'Cross meet low <= mid <= high' + repr(low) + ',' + repr(mid) + ',' + repr(high)
+            s = 'Entry -- Cross meet low <= mid <= high ' + repr(low) + ' ,' + repr(mid) + ' ,' + repr(high)
 
-            print(s)
+            # print(s)
 
         else:
 
@@ -116,9 +116,9 @@ class EdgeEntry(Entries):
 
                 if low <= hub.ZG <= high:
 
-                    s = 'Cross meet low <= ZG <= high ' + repr(low) + ', ' + repr(hub.ZG) + ', ' + repr(high)
+                    s = 'Entry -- Cross meet low <= ZG <= high ' + repr(low) + ', ' + repr(hub.ZG) + ', ' + repr(high)
 
-                    print(s)
+                    # print(s)
 
                     return True
 
@@ -130,9 +130,9 @@ class EdgeEntry(Entries):
 
                 if low <= hub.ZD <= high:
 
-                    s = 'Cross meet low <= ZD <= high ' + repr(low) + ', ' + repr(hub.ZD) + ', ' + repr(high)
+                    s = 'Entry -- Cross meet low <= ZD <= high ' + repr(low) + ', ' + repr(hub.ZD) + ', ' + repr(high)
 
-                    print(s)
+                    # print(s)
 
                     return True
 
@@ -250,9 +250,9 @@ class MidExit(Exits):
 
             cross = True
 
-            s = 'Cross meet low <= mid <= high' + repr(low) + ',' + repr(mid) + ',' + repr(high)
+            s = 'Exit -- Cross meet low <= mid <= high' + repr(low) + ',' + repr(mid) + ',' + repr(high)
 
-            print(s)
+            # print(s)
 
         else:
 
@@ -309,9 +309,9 @@ class EdgeExit(Exits):
 
                 if low <= hub.ZG <= high:
 
-                    s = 'Long - Cross meet low <= ZG <= high ' + repr(low) + ', ' + repr(hub.ZG) + ', ' + repr(high)
+                    s = 'Exit - Cross meet low <= ZG <= high ' + repr(low) + ', ' + repr(hub.ZG) + ', ' + repr(high)
 
-                    print(s)
+                    # print(s)
 
                     return True
 
@@ -323,9 +323,9 @@ class EdgeExit(Exits):
 
                 if low <= hub.ZD <= high:
 
-                    s = 'Short - Cross meet low <= ZD <= high ' + repr(low) + ', ' + repr(hub.ZD) + ', ' + repr(high)
+                    s = 'Exit - Cross meet low <= ZD <= high ' + repr(low) + ', ' + repr(hub.ZD) + ', ' + repr(high)
 
-                    print(s)
+                    # print(s)
 
                     return True
 

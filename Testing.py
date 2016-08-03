@@ -142,7 +142,7 @@ def test_month_10(market, year, month, count=0, skips=0):
 
 def test_year(year, m1, m2):
 
-    candles = Currency.CAD_Ten_Min_Candle_Container()
+    candles = Currency.AUD_Ten_Min_Candle_Container()
 
     types = Hunter.Type_Container(candles)
 
