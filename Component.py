@@ -69,12 +69,12 @@ class MidEntry(Entries):
 
     def order(self, event):
 
-        if self.signaling(event):
+        tran = event._dict['TRAN']
 
-            tran = event._dict['TRAN']
+        # 通过Key确保每个策略仅执行一次
+        if MidEntry._name not in tran._entries:
 
-            # 通过Key确保每个策略仅执行一次
-            if MidEntry._name not in tran._entries:
+            if self.signaling(event):
 
                 k = event._dict['K']
                 point = k.getClose()
@@ -146,12 +146,12 @@ class EdgeEntry(Entries):
 
     def order(self, event):
 
-        if self.signaling(event):
+        tran = event._dict['TRAN']
 
-            tran = event._dict['TRAN']
+        # 通过Key确保每个策略仅执行一次
+        if EdgeEntry._name not in tran._entries:
 
-            # 通过Key确保每个策略仅执行一次
-            if EdgeEntry._name not in tran._entries:
+            if self.signaling(event):
 
                 k = event._dict['K']
                 point = k.getClose()
@@ -262,12 +262,12 @@ class MidExit(Exits):
 
     def order(self, event):
 
-        if self.signaling(event):
+        tran = event._dict['TRAN']
 
-            tran = event._dict['TRAN']
+        # 通过Key确保每个策略仅执行一次
+        if MidExit._name not in tran._exits:
 
-            # 通过Key确保每个策略仅执行一次
-            if MidExit._name not in tran._exits:
+            if self.signaling(event):
 
                 k = event._dict['K']
                 point = k.getClose()
@@ -339,12 +339,12 @@ class EdgeExit(Exits):
 
     def order(self, event):
 
-        if self.signaling(event):
+        tran = event._dict['TRAN']
 
-            tran = event._dict['TRAN']
+        # 通过Key确保每个策略仅执行一次
+        if EdgeExit._name not in tran._exits:
 
-            # 通过Key确保每个策略仅执行一次
-            if EdgeExit._name not in tran._exits:
+            if self.signaling(event):
 
                 k = event._dict['K']
                 point = k.getClose()

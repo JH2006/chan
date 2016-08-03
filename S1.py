@@ -320,8 +320,12 @@ class S2:
             return
 
         # 建仓记录总数与注册的建仓策略数相同，说明平仓完全执行，直接退出
-        if len(self._eTran._entries) == len(self._entries):
-            return
+        try:
+            if len(self._eTran._entries) == len(self._entries):
+                return
+
+        except AttributeError:
+            pass
 
         # 新中枢的第一个建仓记录
         if self._eTran is None:
@@ -349,15 +353,8 @@ class S2:
                 print('中枢高点:', hub.ZG, ' 中枢低点:', hub.ZD, '  中枢方向:', hub.pos)
                 print('###########################')
 
-                # 一旦建仓交易触发，则保存交易记录
-                if self._id not in self._trans:
-
-                    # 新赋值,新交易生成
-                    # 留意：可能需要硬copy，否则引用可能会错
-                    self._trans[self._id] = self._eTran
-
-                    # 新交易的出现伴随止损策略注册
-                    self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.stop)
+                # 新交易的出现伴随止损策略注册
+                # self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.stop)
 
     def exit(self, event):
 
@@ -371,10 +368,6 @@ class S2:
 
         hub = event._dict['HUB']
 
-        # 第一个中枢不操作
-        if hub.pos == '--':
-            return
-
         event._dict['TRAN'] = self._xTran
 
         for name in self._exits:
@@ -384,7 +377,7 @@ class S2:
                 print('###########################')
                 print('Tran ID:', self._xTran._id)
                 print('平仓类型:', name, '  平仓K线:', event._dict['LENOFK'])
-                print('成交价:', self._xTran.exits[name][0])
+                print('成交价:', self._xTran._exits[name][0])
                 print('中枢高点:', hub.ZG, ' 中枢低点:', hub.ZD, '  中枢方向:', hub.pos)
                 print('###########################')
 
@@ -515,13 +508,13 @@ class S2:
         # 注册中枢确认附件条件处理
         self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.tradeCommit)
 
-
         if self._eTran is not None:
 
             self._trans[self._id] = self._eTran
 
             self._xTran = self._trans[self._id]
 
+            # 重新赋值eTran，准备开始新的建仓记录
             self._eTran = None
 
             # 注册平仓策略
