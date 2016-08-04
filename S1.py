@@ -504,7 +504,7 @@ class S2:
         hub_k_pos = curHub.e_pen.endType.candle_index
         last_k_post = event._dict['LENOFK']
 
-        print('新中枢ID:', event._dict['hub_id'], '中枢确认K线:', hub_k_pos, '当下K线:', last_k_post)
+        print('新中枢ID:', event._dict['hub_id'], ' 中枢确认K线:', hub_k_pos, ' 当下K线:', last_k_post, ' 方向:', curHub.pos)
 
         # 关闭建仓处理
         self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)

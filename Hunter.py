@@ -440,23 +440,23 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             pens.insertPen()
 
-            # K线生成事件注入 
-            can = monitor.genEvent(Event.Monitor.K_GEN)
-
-            try:
-
-                can._dict['K'] = self.container[len(self.container) - 1]
-                can._dict['LENOFK'] = len(self.container) - 1
-                can._dict['HUB'] = hubs.container[len(hubs.container) - 1]
-                can._dict['PENS'] = pens.container
-
-            except IndexError:
-
-                pass
-
-            monitor._e.put(can)
-
-            sleep(0.002)
+            # # K线生成事件注入
+            # can = monitor.genEvent(Event.Monitor.K_GEN)
+            #
+            # try:
+            #
+            #     can._dict['K'] = self.container[len(self.container) - 1]
+            #     can._dict['LENOFK'] = len(self.container) - 1
+            #     can._dict['HUB'] = hubs.container[len(hubs.container) - 1]
+            #     can._dict['PENS'] = pens.container
+            #
+            # except IndexError:
+            #
+            #     pass
+            #
+            # monitor._e.put(can)
+            #
+            # sleep(0.002)
 
             single = hubs.insertHub()
 
@@ -471,7 +471,7 @@ class Ten_Min_Candle_Container(Candle_Container):
 
                 try:
 
-                    # 当下中枢ID 
+                    # 当下中枢ID
                     born._dict['hub_id'] = len(hubs.container) - 1
 
                     # 当下K线
@@ -491,6 +491,14 @@ class Ten_Min_Candle_Container(Candle_Container):
                 monitor._e.put(born)
 
                 sleep(0.002)
+
+                pass
+
+            elif single == -1:
+
+                if hubs.isGrow():
+
+                    print('K----', len(self.container) - 1)
 
 
 # 抽象类,用于给不同的具体产品实现
@@ -1277,6 +1285,7 @@ class Pen_Container():
 
 class Hub:
     def __init__(self, ZG, ZD, GG, DD, s_pen, e_pen, s_pen_index, e_pen_index):
+
         self.ZG = ZG
         self.ZD = ZD
         self.GG = GG
@@ -1285,6 +1294,9 @@ class Hub:
         self.e_pen = e_pen
         self.s_pen_index = s_pen_index
         self.e_pen_index = e_pen_index
+
+        # 2016-08-04
+        self._grow = False
 
     # 2016-05-16
     # 新增管理中枢笔索引的接
@@ -1355,6 +1367,9 @@ class Hub_Container:
                               cur_pen_index + 1,
                               cur_pen_index + self.hub_width)
 
+                    # 2016-08-04
+                    hub._grow = True
+
                     # 2016-04-04
                     # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
                     hub.x_pen = copy.deepcopy(hub.e_pen)
@@ -1375,6 +1390,10 @@ class Hub_Container:
                         cur_pen_index = i + 1
 
                         self.last_hub_end_pen_index = i
+
+                        # 2016-08-04
+                        hub._grow = True
+
                     else:
 
                         cur_pen_index += self.hub_width + 1
@@ -1430,6 +1449,10 @@ class Hub_Container:
                 # 新增管理中枢笔索引的接口
                 self.container[last_hub_index].update_e_pen_index(self.last_hub_end_pen_index)
 
+                # 2016-08-04
+                self.container[last_hub_index]._grow = True
+
+                # 中枢扩张
                 return 0
 
             # 新生成的笔没能归入已知最后一个中枢,则从最后一个中枢笔开始进行遍历看是否在新生成笔后出现了新中枢的可能
@@ -1467,6 +1490,9 @@ class Hub_Container:
                         # 2016-04-04
                         # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
                         hub.x_pen = copy.deepcopy(hub.e_pen)
+
+                        # 2016-08-04
+                        hub._grow = True
 
                         # 2016-04-17
                         # 新临时变量临时保存cur_pen_index,用于加载Bucket的时候使用
@@ -1509,6 +1535,9 @@ class Hub_Container:
 
                                     self.last_hub_end_pen_index = e_hub_pen_index
 
+                                    # 2016-08-04
+                                    hub._grow = True
+
                                 # 不具有可扩展新
                                 else:
 
@@ -1549,6 +1578,9 @@ class Hub_Container:
 
                                     self.last_hub_end_pen_index = e_hub_pen_index
 
+                                    # 2016-08-04
+                                    hub._grow = True
+
                                 else:
 
                                     cur_pen_index += self.hub_width + 1
@@ -1570,20 +1602,9 @@ class Hub_Container:
                     else:
                         cur_pen_index += 1
 
-                ## 返回1的时候说明已经到了边界
-                # return -1
+                # while 循环结束。返回-1的时候说明已经到了边界
+                return -1
 
-                # 2016-06-28
-                # 存在局部延伸，但又还不足构成完整中枢延伸
-                m = self.isGrow(last_hub, self.last_hub_end_pen_index)
-
-                if m != 0:
-
-                    return m
-
-                else:
-
-                    return -1
 
     def size(self):
 
@@ -1725,19 +1746,23 @@ class Hub_Container:
     # 用于失败中枢是否存在延伸的可能。这里的“可能性”是指目前的笔和中枢存在交集，但数量上没能达到end_pen_index+2*t, t = 1,2,3,4,5..的要求
     # 如果中枢和新笔存在交集则为延伸，接口返回笔索引，但不会对中枢做任何修改
     # 否则返回0
-    def isGrow(self, hub, end_pen_index):
+    def isGrow(self):
 
-        # 中枢重叠区间
+        try:
+
+            hub = self.container[len(self.container) - 1]
+
+        except IndexError:
+
+            return
+
         hub_ZG = hub.ZG
         hub_ZD = hub.ZD
 
-        # 初始化标识为0
-        mark = 0
-
         # 初始化索引为当前中枢后一笔
-        i = end_pen_index + 1
+        i = self.last_hub_end_pen_index + 1
 
-        while i < self.pens.pens_index:
+        if i < self.pens.pens_index:
 
             pen_high = self.pens.container[i].high
             pen_low = self.pens.container[i].low
@@ -1748,19 +1773,37 @@ class Hub_Container:
             # 存在交集
             if min_high > max_low:
 
-                # 保持最后索引位置
-                mark = i
+                if self.pens.container[i].legal() is True:
 
-                # 索引继续往前探寻
-                i += 1
+                    i += 1
 
-            # 不存在交集,或者探寻结束
-            else:
+                    try:
+                        if self.pens.container[i].legal() is True:
 
-                break
+                            k_h = self.pens.container[i].endType.candle.getHigh()
+                            k_l = self.pens.container[i].endType.candle.getLow()
 
-        return mark
+                            if hub.pos == 'Up':
 
+                                if k_l > hub_ZG and hub._grow is True:
+
+                                    hub._grow = False
+
+                                    return True
+
+                            else:
+
+                                if k_h < hub_ZD and hub._grow is True:
+
+                                    hub._grow = False
+
+                                    return True
+
+                    except IndexError:
+
+                        return False
+
+        return False
 
 class Hour_Hub_Container(Hub_Container):
 
