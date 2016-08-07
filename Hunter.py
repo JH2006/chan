@@ -315,11 +315,6 @@ class Candle_Container:
 
         return len(self.container)
 
-    # 实现新增K线插入接口
-    def insertCandle(self, candle):
-
-        self.container.append(candle)
-
     def closeDB(self):
 
         self._c.closeDB()
@@ -438,25 +433,33 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             types.insertType(m)
 
-            pens.insertPen()
+            pen_deleted = pens.insertPen()
 
-            # # K线生成事件注入
-            # can = monitor.genEvent(Event.Monitor.K_GEN)
-            #
-            # try:
-            #
-            #     can._dict['K'] = self.container[len(self.container) - 1]
-            #     can._dict['LENOFK'] = len(self.container) - 1
-            #     can._dict['HUB'] = hubs.container[len(hubs.container) - 1]
-            #     can._dict['PENS'] = pens.container
-            #
-            # except IndexError:
-            #
-            #     pass
-            #
-            # monitor._e.put(can)
-            #
-            # sleep(0.002)
+            # 2016-08-05
+            # 出现了属于中枢的笔被删除
+            if pen_deleted < 10000:
+
+                if hubs.revert(pen_deleted) is True:
+
+                    print('中枢修正:', len(self.container) - 1)
+
+            # K线生成事件注入
+            can = monitor.genEvent(Event.Monitor.K_GEN)
+
+            try:
+
+                can._dict['K'] = self.container[len(self.container) - 1]
+                can._dict['LENOFK'] = len(self.container) - 1
+                can._dict['HUB'] = hubs.container[len(hubs.container) - 1]
+                can._dict['PENS'] = pens.container
+
+            except IndexError:
+
+                pass
+
+            monitor._e.put(can)
+
+            sleep(0.002)
 
             single = hubs.insertHub()
 
@@ -492,13 +495,29 @@ class Ten_Min_Candle_Container(Candle_Container):
 
                 sleep(0.002)
 
-                pass
-
+            # 无中枢更新
             elif single == -1:
 
+                # 判断是否出现第三类买卖点
                 if hubs.isGrow():
 
-                    print('K----', len(self.container) - 1)
+                    born = monitor.genEvent(Event.Monitor.STOP)
+
+                    try:
+
+                        # 当下K线
+                        born._dict['K'] = self.container[len(self.container) - 1]
+
+                        # 当下K线队列长度
+                        born._dict['LENOFK'] = len(self.container) - 1
+
+                    except KeyError:
+
+                        pass
+
+                    monitor._e.put(born)
+
+                    sleep(0.002)
 
 
 # 抽象类,用于给不同的具体产品实现
@@ -783,8 +802,15 @@ class Pen():
         self.endType = endType
         self.pos = pos
 
+        # 2016-08-05
+        # 标示笔是否属于某个中枢
+        # 如果笔已经属于中枢,但在笔合并过程中被删除,则中枢要做对应修改
+        # 由于Python采用的是引用,即使笔合并过程中被删除,中枢所引用部分仍然会指向已经被删除的笔,这造成中枢中的笔索引和笔管理器中的笔不一致
+        self._bHub = False
+
     def legal(self):
 
+        # K线数量上的条件
         if self.endType.candle_index - self.beginType.candle_index >= 4:
 
             return True
@@ -889,7 +915,7 @@ class Pen_Container():
                 else:
                     break
 
-        self.__merge_pen()
+        return self.__merge_pen()
 
     def probeUp(self):
 
@@ -960,6 +986,13 @@ class Pen_Container():
     # 要判断是删除前一笔还是后一笔的关键在于那种删除方式能令具有更剧烈的涵盖范围,也就是高点更高,低点更低
     def __merge_pen(self):
 
+        # 2016-08-05
+        # 发现在merge过程中被删除的并且已经归属于某个中枢的笔
+        # 局部变量初始为10000,一旦发现上述情况出现则修改为笔索引
+        # 每次Merge可能会出现多次笔删除的情况,此变量记录最靠前的一笔
+        # 做为函数返回值返回
+        pen_deleted = 10000
+
         # 循环体在笔队列反向偏置2的位置结束的原因是防止越界
 
         # 2016-03-25
@@ -979,7 +1012,7 @@ class Pen_Container():
             # 2016-03-22
             # 修改为len(pens),同时修改了revert_pen的判决回退条件
             if self.size() - self.pens_stack_index >= 2 and len(self.pens_stack) != 0:
-                self.__revert_pen()
+                pen_deleted = self.__revert_pen()
 
             """
             # 2016-03-22
@@ -1016,7 +1049,9 @@ class Pen_Container():
 
                             # 如果发现回调测试还未来得及执行就再次出现新低的情况的话,马上进行回调处理
                             if len(self.pens_stack) != 0:
-                                self.__revert_pen()
+                                p = self.__revert_pen()
+
+                                pen_deleted = min(p, pen_deleted)
 
                             # 在笔修改前,保存此笔于堆栈,命名为回退笔
                             self.pens_stack.append(copy.deepcopy(self.container[self.pens_index - 2]))
@@ -1028,13 +1063,21 @@ class Pen_Container():
 
                             # 销毁当前笔以及前一个与此笔相连的向上笔
                             # 注意销毁顺序必须是由后向前,否则会误删其他笔
-                            self.container.pop(self.pens_index)
+                            p = self.container.pop(self.pens_index)
+
+                            if p._bHub is True:
+
+                                pen_deleted = min(self.pens_index, pen_deleted)
 
                             # 在删除笔前,保存此笔于堆栈
                             self.pens_stack.append(copy.deepcopy(self.container[self.pens_index - 1]))
                             self.pens_stack_delay.append(copy.deepcopy(self.container[self.pens_index - 1]))
 
-                            self.container.pop(self.pens_index - 1)
+                            p = self.container.pop(self.pens_index - 1)
+
+                            if p._bHub is True:
+
+                                pen_deleted = min(self.pens_index-1, pen_deleted)
 
                             # 在全局笔队列指针修改前,保存临时堆栈中笔所处于的全局笔队列的位置
                             # 注意,此处减了2,因为这是当前笔与回退笔的最小偏置,它指向的是被保存的笔
@@ -1061,7 +1104,11 @@ class Pen_Container():
 
                         # 销毁当前笔以及后一个向上笔
                         self.container.pop(self.pens_index + 1)
-                        self.container.pop(self.pens_index)
+                        p = self.container.pop(self.pens_index)
+
+                        if p._bHub is True:
+
+                                pen_deleted = min(self.pens_index, pen_deleted)
 
                     # 最后一种情况是不合法向下笔被前一笔完全包含,这和第一个情况相反
                     # 同时不合法笔后面的向上笔也被前一向上笔完全包含
@@ -1076,7 +1123,11 @@ class Pen_Container():
 
                             # 不合法笔以及与其相连的后一向上笔被销毁
                             self.container.pop(self.pens_index + 1)
-                            self.container.pop(self.pens_index)
+                            p = self.container.pop(self.pens_index)
+
+                            if p._bHub is True:
+
+                                pen_deleted = min(self.pens_index, pen_deleted)
 
                         # 如果此场景不满足了, 就暂时不做处理, 如果后面还有一笔的话也有可能可以处理笔合并
 
@@ -1101,12 +1152,20 @@ class Pen_Container():
                             self.container[self.pens_index - 2].high = self.container[self.pens_index].high
                             self.container[self.pens_index - 2].endType = self.container[self.pens_index].endType
 
-                            self.container.pop(self.pens_index)
+                            p = self.container.pop(self.pens_index)
+
+                            if p._bHub is True:
+
+                                pen_deleted = min(self.pens_index, pen_deleted)
 
                             # 2016-03-21
                             self.pens_stack.append(copy.deepcopy(self.container[self.pens_index - 1]))
 
-                            self.container.pop(self.pens_index - 1)
+                            p = self.container.pop(self.pens_index - 1)
+
+                            if p._bHub is True:
+
+                                pen_deleted = min(self.pens_index-1, pen_deleted)
 
                             # 2016-03-21
                             self.pens_stack_index = self.pens_index - 2
@@ -1133,7 +1192,11 @@ class Pen_Container():
                         self.container[self.pens_index - 1].low = post_pen.low
                         self.container[self.pens_index - 1].endType = post_pen.endType
                         self.container.pop(self.pens_index + 1)
-                        self.container.pop(self.pens_index)
+                        p = self.container.pop(self.pens_index)
+
+                        if p._bHub is True:
+
+                                pen_deleted = min(self.pens_index, pen_deleted)
 
                     elif pre_pen.high > self.container[self.pens_index].high and post_pen.low > pre_pen.low:
 
@@ -1142,7 +1205,11 @@ class Pen_Container():
                             self.container[self.pens_index + 2].low = pre_pen.low
                             self.container[self.pens_index + 2].beginType = pre_pen.endType
                             self.container.pop(self.pens_index + 1)
-                            self.container.pop(self.pens_index)
+                            p = self.container.pop(self.pens_index)
+
+                            if p._bHub is True:
+
+                                pen_deleted = min(self.pens_index, pen_deleted)
 
                         else:
                             # self.pens_index += 1
@@ -1152,6 +1219,8 @@ class Pen_Container():
 
                 self.pens_index += 1
 
+        return pen_deleted
+
     # 回退笔操作函数
     # 回退操作可以分为向上和向下两种,目前仅实现了对向下笔的回退
     # 为什么需要回退操作:回退操作可以认为是merge函数的补充.merge函数已经可以处理绝大部分非法笔的合并处理,但有一种情况需要再进行一次额外的监控处理.
@@ -1160,6 +1229,10 @@ class Pen_Container():
     # 但如果在此非法笔底部之后仍然继续有新低,并且这个新低可以和被删除的合法向上笔的顶部构成一个向下笔,那么之前的合法向上笔不应该被删除,合法向上笔的前一个向下笔底部也不应该被修改
     # 程序负责对上述两种状态做判断,要保留修改后的笔还是恢复原来的笔
     def __revert_pen(self):
+
+        # 2016-08-05
+        # 参考__merger的注释
+        pen_deleted = 100000
 
         # pen_r 为相对靠近右边的笔
         # pen_l 为相对靠近左边的笔
@@ -1222,8 +1295,11 @@ class Pen_Container():
                 self.container[self.pens_stack_index].low = legend_pen_l.low
 
                 # 下面的5个步骤都是关于删除/插入笔的动作.这个的关键是索引偏置
-                # pens.pop(g_pens_index-1)
-                self.container.pop(self.pens_stack_index + 2)
+                p = self.container.pop(self.pens_stack_index + 2)
+
+                if p._bHub is True:
+
+                    pen_deleted = min(self.pens_stack_index + 2, pen_deleted)
 
                 # 在偏置为1的位置恢复向上笔
                 self.container.insert(self.pens_stack_index + 1, copy.deepcopy(legend_pen_r))
@@ -1231,7 +1307,11 @@ class Pen_Container():
                 # 在偏置为2的位置新插入向下笔
                 self.container.insert(self.pens_stack_index + 2, copy.deepcopy(pen))
 
-                self.container.pop(self.pens_stack_index + 3)
+                p = self.container.pop(self.pens_stack_index + 3)
+
+                if p._bHub is True:
+
+                    pen_deleted = min(self.pens_stack_index + 2, pen_deleted)
 
                 # 把全局指针往后移动1位以便指向当前需要处理的笔
                 self.pens_index += 1
@@ -1240,12 +1320,14 @@ class Pen_Container():
                 if len(self.pens_stack_delay) != 0:
                     self.pens_stack_delay = []
 
+            return pen_deleted
+
         # TODO 当前没有实现对上行笔的延迟判决，需要考虑实现.有过调测,但没有完成
-        """
+
         # 2016-03-22
         # 实现向上的相似延迟处理
         else:
-
+            """
             cur_top_k_index = pen_2['End_Type']['K_Index']
             cur_top_k = pen_2['End_Type']
 
@@ -1276,7 +1358,8 @@ class Pen_Container():
                 pens.pop(self.pens_stack_index+3)
 
                 g_pens_index += 1
-        """
+            """
+            return pen_deleted
 
     def size(self):
 
@@ -1368,7 +1451,13 @@ class Hub_Container:
                               cur_pen_index + self.hub_width)
 
                     # 2016-08-04
+                    # 标示第三类买卖点第一次形成
                     hub._grow = True
+
+                    # 2016-08-05
+                    # 新增一个笔标示的处理,识别笔与中枢的归属关系
+                    self.pens.container[cur_pen_index + 1]._bHub = True
+                    self.pens.container[cur_pen_index + self.hub_width]._bHub = True
 
                     # 2016-04-04
                     # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
@@ -1382,6 +1471,9 @@ class Hub_Container:
 
                         # 修改终结点
                         hub.e_pen = self.pens.container[i]
+
+                        # 2016-08-05
+                        self.pens.container[i]._bHub = True
 
                         # 2016-05-16
                         # 新增管理中枢笔索引的接
@@ -1452,6 +1544,9 @@ class Hub_Container:
                 # 2016-08-04
                 self.container[last_hub_index]._grow = True
 
+                # 2016-08-05
+                self.container[last_hub_index].e_pen._bHub = True
+
                 # 中枢扩张
                 return 0
 
@@ -1493,6 +1588,11 @@ class Hub_Container:
 
                         # 2016-08-04
                         hub._grow = True
+
+                        # 2016-08-05
+                        # 新增一个笔标示的处理,识别笔与中枢的归属关系
+                        self.pens.container[cur_pen_index + 1]._bHub = True
+                        self.pens.container[cur_pen_index + self.hub_width]._bHub = True
 
                         # 2016-04-17
                         # 新临时变量临时保存cur_pen_index,用于加载Bucket的时候使用
@@ -1538,6 +1638,9 @@ class Hub_Container:
                                     # 2016-08-04
                                     hub._grow = True
 
+                                    # 2016-08-05
+                                    self.pens.container[e_hub_pen_index]._bHub = True
+
                                 # 不具有可扩展新
                                 else:
 
@@ -1581,6 +1684,9 @@ class Hub_Container:
                                     # 2016-08-04
                                     hub._grow = True
 
+                                    # 2016-08-05
+                                    self.pens.container[e_hub_pen_index]._bHub = True
+
                                 else:
 
                                     cur_pen_index += self.hub_width + 1
@@ -1605,6 +1711,54 @@ class Hub_Container:
                 # while 循环结束。返回-1的时候说明已经到了边界
                 return -1
 
+    # 2016-08-05
+    # 中枢笔被删除时候做一定的中枢反转
+    # 中枢反转是指中枢最后一个笔的指针前移到一个合理的位置,重新计算中枢
+    def revert(self, pen_deleted):
+
+        try:
+
+            hub = self.container[self.size() - 1]
+            pen_index = hub.s_pen_index
+
+        except IndexError:
+
+            return False
+
+        # 中枢前三笔不做处理
+        if pen_deleted - 2 < pen_index + self.hub_width:
+
+            # print('中枢前三笔不做处理')
+
+            return False
+
+        # 笔没有落在当前中枢范围内
+        elif pen_deleted < hub.s_pen_index or pen_deleted > hub.e_pen_index:
+
+            # print('笔没有落在当前中枢范围内')
+
+            return False
+
+        else:
+
+            if hub.pos == self.pens.container[pen_deleted - 1].pos:
+
+                self.last_hub_end_pen_index = pen_deleted - 2
+
+            else:
+
+                self.last_hub_end_pen_index = pen_deleted - 1
+
+            # 修改终结点
+            hub.e_pen = self.pens.container[self.last_hub_end_pen_index]
+            hub.update_e_pen_index(self.last_hub_end_pen_index)
+
+            # 复位为挪出中枢范围的笔的中枢隶属状态位
+            for i in range(self.last_hub_end_pen_index, self.pens.pens_index):
+
+                self.pens.container[i]._bHub = False
+
+            return True
 
     def size(self):
 
@@ -1706,7 +1860,7 @@ class Hub_Container:
             max_low = max(hub_ZD, pen_low)
 
             # 存在交集
-            if min_high > max_low:
+            if min_high >= max_low:
 
                 # 保持最后索引位置
                 cur_index = i
@@ -1771,7 +1925,7 @@ class Hub_Container:
             max_low = max(hub_ZD, pen_low)
 
             # 存在交集
-            if min_high > max_low:
+            if min_high >= max_low:
 
                 if self.pens.container[i].legal() is True:
 
@@ -1785,7 +1939,7 @@ class Hub_Container:
 
                             if hub.pos == 'Up':
 
-                                if k_l > hub_ZG and hub._grow is True:
+                                if k_l >= hub_ZG and hub._grow is True:
 
                                     hub._grow = False
 
@@ -1793,7 +1947,7 @@ class Hub_Container:
 
                             else:
 
-                                if k_h < hub_ZD and hub._grow is True:
+                                if k_h <= hub_ZD and hub._grow is True:
 
                                     hub._grow = False
 

@@ -128,6 +128,7 @@ class Monitor:
     HUB_GROW = 'hub_grow'
     HUB_END = 'hub_end'
     K_GEN = 'K_gen'
+    STOP = 'stop_loss'
 
     def __init__(self, strategy):
 
@@ -160,7 +161,6 @@ class Monitor:
     def hub_gen(self, event):
 
         self._s.hub_gen(event)
-
 
     # 中枢终结事件处理接口
     def hub_end(self, event):
@@ -202,4 +202,4 @@ class Monitor:
 
     def stop(self, event):
 
-        self._e.stop(event)
+        self._s.stop(event)

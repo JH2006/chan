@@ -349,7 +349,7 @@ class S2:
                 print('Tran ID:', self._eTran._id, ' 建仓类型:', name, ' 成交价:', self._eTran._entries[name][0], '  建仓K线:', event._dict['LENOFK'])
 
                 # 新交易的出现伴随止损策略注册
-                # self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.stop)
+                self._monitor._e.register(Event.Monitor.STOP, self._monitor.stop)
 
     def exit(self, event):
 
@@ -394,31 +394,23 @@ class S2:
         if len(self._eTran._entries) == 0:
             return
 
-        try:
-
-            hub = event._dict['HUB']
-
-        except KeyError:
-
-            print('Strategy--exit() 中枢访问越界')
-            return
-
-        # 第一个中枢不操作
-        if hub.pos == '--':
-            return
-
         # 当下的交易
         event._dict['TRAN'] = self._eTran
 
         for name in self._stops:
 
             if self._stops[name].order(event):
-                print('###########################')
-                print('Tran ID:', self._eTran._id)
-                print('止损类型:', name, '  止损K线:', event._dict['LENOFK'])
-                print('止损价:', self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1])
-                print('中枢高点:', hub.ZG, ' 中枢低点:', hub.ZD, '  中枢方向:', hub.pos)
-                print('###########################')
+
+                if __debug__:
+
+                    print('Tran ID:', self._eTran._id, ' 止损类型:', name, '  止损K线:', event._dict['LENOFK'],
+                          ' 止损价:', self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1])
+
+                    entries = self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][0]
+
+                    for name in entries:
+
+                        print('止损对象:', name, '成交价:', entries[name][0])
 
     def position(self, event):
 
