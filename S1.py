@@ -498,6 +498,10 @@ class S2:
 
         print('新中枢ID:', event._dict['hub_id'], ' 中枢确认K线:', hub_k_pos, ' 当下K线:', last_k_post, ' 方向:', curHub.pos)
 
+        if hub_k_pos == 1480:
+
+            print('')
+
         # 关闭建仓处理
         self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)
 
@@ -535,19 +539,19 @@ class S2:
 
         try:
 
-            third_pen = pens[first_pen_index + 2]
+            third_pen = pens.container[first_pen_index + 2]
 
         except IndexError:
 
             return False
 
-        if third_pen.legal():
+        if third_pen.legal() and pens.illPen(third_pen):
 
             try:
 
-                fourth_pen = pens[first_pen_index + 3]
+                fourth_pen = pens.container[first_pen_index + 3]
 
-                if fourth_pen.legal():
+                if fourth_pen.legal() and pens.illPen(fourth_pen):
 
                     print('第四笔确认--笔末端K:', fourth_pen.endType.candle_index, '当下K:', last_k_post)
 

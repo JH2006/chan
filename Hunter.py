@@ -111,9 +111,9 @@ class Connector:
     @staticmethod
     def dump_mongoDB():
 
-        coll = Connector.mongodb.CAD10m
+        coll = Connector.mongodb.AUD10m
 
-        e_1 = pd.read_csv('ccon5094@uni.sydney.edu.au-CAD10m-N118276288.csv')
+        e_1 = pd.read_csv('ccon5094@uni.sydney.edu.au-AUD10m-N112284425.csv')
 
         print('len:', len(e_1))
 
@@ -451,7 +451,7 @@ class Ten_Min_Candle_Container(Candle_Container):
                 can._dict['K'] = self.container[len(self.container) - 1]
                 can._dict['LENOFK'] = len(self.container) - 1
                 can._dict['HUB'] = hubs.container[len(hubs.container) - 1]
-                can._dict['PENS'] = pens.container
+                can._dict['PENS'] = pens
 
             except IndexError:
 
@@ -796,6 +796,7 @@ class Type_Container:
 class Pen():
 
     def __init__(self, high, low, beginType, endType, pos):
+
         self.high = high
         self.low = low
         self.beginType = beginType
@@ -818,6 +819,10 @@ class Pen():
         else:
 
             return False
+
+    def __del__(self):
+
+        self._arr = None
 
 
 class Pen_Container():
@@ -1005,8 +1010,7 @@ class Pen_Container():
             # 只有当用于回退的临时笔队列不为空(说明有回退操作的可能),回退笔与当前笔有至少两笔的距离的时候才进行操作
             # 2016-03-21
             # 关于是采用self.pens_index还是len(pens)与self.pens_stack_index的距离判断问题
-            # 测试发现有些场景采用len(pens)的时候判断revert的准确性没有self.pens_index高,其实本质在于用self.pens_index的时候延迟时间较长,在走势
-            # 上看,更容易出现了满足revert条件的K线而已,其他没有差别
+            # 测试发现有些场景采用len(pens)的时候判断revert的准确性没有self.pens_index高,其实本质在于用self.pens_index的时候延迟时间较长,在走势上看,更容易出现了满足revert条件的K线而已,其他没有差别
             # 这是在时间和准确性上的平衡取舍
 
             # 2016-03-22
@@ -1364,6 +1368,35 @@ class Pen_Container():
     def size(self):
 
         return len(self.container)
+
+    def illPen(self, pen):
+
+        s_k_index = pen.beginType.candle_index
+        e_k_index = pen.endType.candle_index
+
+        if pen.pos == 'Up':
+
+            highest = self.__types.candle_container.container[e_k_index].getHigh()
+
+            for i in range(s_k_index, e_k_index):
+
+                if self.__types.candle_container.container[i].getHigh() > highest:
+
+                    return False
+
+            return True
+
+        else:
+
+            lowest = self.__types.candle_container.container[e_k_index].getLow()
+
+            for i in range(s_k_index, e_k_index):
+
+                if self.__types.candle_container.container[i].getLow() < lowest:
+
+                    return False
+
+            return True
 
 
 class Hub:
@@ -1927,12 +1960,12 @@ class Hub_Container:
             # 存在交集
             if min_high >= max_low:
 
-                if self.pens.container[i].legal() is True:
+                if self.pens.container[i].legal() is True and self.pens.illPen(self.pens.container[i]) is True:
 
                     i += 1
 
                     try:
-                        if self.pens.container[i].legal() is True:
+                        if self.pens.container[i].legal() is True and self.pens.illPen(self.pens.container[i]) is True:
 
                             k_h = self.pens.container[i].endType.candle.getHigh()
                             k_l = self.pens.container[i].endType.candle.getLow()
@@ -2545,7 +2578,6 @@ class Tran_Container:
         return d
 
 if __name__ == '__main__':
-   
-    print('dfdff')
+ 
 
     Connector.dump_mongoDB()
