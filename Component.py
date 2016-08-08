@@ -305,7 +305,7 @@ class EdgeExit(Exits):
 
         try:
 
-            if tran._placement == 'Long':
+            if tran._placement == 'LONG':
 
                 if low <= hub.ZG <= high:
 

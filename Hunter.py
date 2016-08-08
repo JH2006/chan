@@ -1369,6 +1369,11 @@ class Pen_Container():
 
         return len(self.container)
 
+    # 2016-08-08
+    # 笔形态合理性判断
+    # 从关联关系上考虑,因为需要访问到构成笔的K线信息,单一的笔对象目前没有实现这类数据的保存。可以实现修改,不过会引入较大的工作量,特别是在
+    # 对于笔的生成条件判读最理想是在Pen_Container.__merge()和Pen_Container.__revert(),只是这两个函数算法复杂,牵扯很多基础结构
+    # 此笔形态的判断是否弱判断,是为了让某些操作结果更精确,为减少实现难度,所以独立出一个函数,而没有在上述的两个基础算法函数中修改
     def illPen(self, pen):
 
         s_k_index = pen.beginType.candle_index

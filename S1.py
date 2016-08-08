@@ -545,13 +545,13 @@ class S2:
 
             return False
 
-        if third_pen.legal() and pens.illPen(third_pen):
+        if third_pen.legal():
 
             try:
 
                 fourth_pen = pens.container[first_pen_index + 3]
 
-                if fourth_pen.legal() and pens.illPen(fourth_pen):
+                if fourth_pen.legal():
 
                     print('第四笔确认--笔末端K:', fourth_pen.endType.candle_index, '当下K:', last_k_post)
 
