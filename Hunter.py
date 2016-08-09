@@ -448,10 +448,18 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             try:
 
+                # 当下一个K线
                 can._dict['K'] = self.container[len(self.container) - 1]
+                # K线ID
                 can._dict['LENOFK'] = len(self.container) - 1
+                # 当下中枢
                 can._dict['HUB'] = hubs.container[len(hubs.container) - 1]
+                # 笔容器对象
                 can._dict['PENS'] = pens
+                # 分型容器对象
+                can._dict['TYPES'] = types
+                # K线容器对象
+                can._dict['CANDLES'] = self
 
             except IndexError:
 

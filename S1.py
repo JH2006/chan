@@ -297,9 +297,11 @@ class S2:
     # 根据具体的策略要求组合不同的Entry
     def loadEntry(self):
 
-        self._entries[Component.MidEntry._name] = Component.MidEntry(0.5)
+        self._entries[Component.MidEntry._name] = Component.MidEntry(0.3)
 
-        self._entries[Component.EdgeEntry._name] = Component.EdgeEntry(0.5)
+        self._entries[Component.EdgeEntry._name] = Component.EdgeEntry(0.3)
+
+        self._entries[Component.StepEntry._name] = Component.StepEntry(0.4)
 
     def loadExit(self):
 
@@ -403,14 +405,41 @@ class S2:
 
                 if __debug__:
 
-                    print('Tran ID:', self._eTran._id, ' 止损类型:', name, '  止损K线:', event._dict['LENOFK'],
-                          ' 止损价:', self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1])
+                    print('Tran ID:', self._eTran._id, ' 止损类型:', name, ' 止损价:', self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1], '  止损K线:', event._dict['LENOFK'])
 
                     entries = self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][0]
 
                     for name in entries:
 
                         print('止损对象:', name, '成交价:', entries[name][0])
+
+                    if len(entries) == 3:
+
+                        p = 0
+
+                        for name in entries:
+
+                            p += entries[name][0] * entries[name][1]
+                        
+                    else:
+
+                        p = 0
+
+                        for name in entries:
+
+                            p += entries[name][0]
+
+                        p = p / len(entries)
+
+                    if self._eTran._placement == 'LONG':
+
+                        g = self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1] / p - 1
+
+                    else:
+
+                        g = p / self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1] -1
+
+                    print('平均成交价:', p, ' 止损价:', self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1], ' 损失:', g)
 
     def position(self, event):
 
