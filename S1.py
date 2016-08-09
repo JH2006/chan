@@ -388,6 +388,8 @@ class S2:
 
                             print('平仓类型:', name, ' 成交价:', self._xTran._exits[name][0], ' 仓位:', self._xTran._exits[name][1])
 
+                        print('总收益:', self._xTran.gain())
+
                         print('***********************')
 
     def stop(self, event):
@@ -413,7 +415,7 @@ class S2:
 
                         print('止损对象:', name, '成交价:', entries[name][0])
 
-                    if len(entries) == 3:
+                    if len(entries) == len(self._entries):
 
                         p = 0
 
@@ -439,7 +441,7 @@ class S2:
 
                         g = p / self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1] -1
 
-                    print('平均成交价:', p, ' 止损价:', self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1], ' 损失:', g)
+                    print('平均成交价:', p, ' 止损价:', self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][1], ' 总损失:', self._eTran.stop())
 
     def position(self, event):
 

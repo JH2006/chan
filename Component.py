@@ -456,10 +456,108 @@ class Tran:
 
         # 建仓交易记录
         self._entries = {}
+
         # 平仓交易记录
         self._exits = {}
-        # 止损交易记录
+
+        # 止损交易记录,可能多于一次相同规则的止损,所以不能采用Key/Value
         self._stops = []
+
+        # 获利
+        self._gain = 0
+
+    def gain(self):
+
+        # 计算建仓均价
+        e = 0
+
+        # 计算平仓均价
+        x = 0
+
+        # 满仓操作
+        # 建仓均价按标准定义仓位计算
+        if len(self._entries) == 3:
+
+            for n in self._entries:
+
+                e += self._entries[n][0] * self._entries[n][1]
+
+        # 非满仓操作
+        # 建仓均价按照操作次数平均值计算
+        else:
+
+            for n in self._entries:
+
+                e += self._entries[n][0]
+
+            e = e / len(self._entries)
+
+
+        for n in self._exits:
+
+            x += self._exits[n][0]
+
+        x = x / len(self._exits)
+
+        if self._placement == 'LONG':
+
+            g = x / e - 1
+
+        else:
+
+            g = e / x - 1
+
+        l = self.stop()
+
+        self._gain = g + l
+
+        return self._gain
+
+    def stop(self):
+
+        lost = 0
+
+        # 记录的止损次数
+        for i, _ in enumerate(self._stops):
+
+            # 每次止损操作可能出现不同的止损策略
+            for name in self._stops[i]:
+
+                entries = self._stops[i][name][0]
+
+                # 满仓操作
+                # 建仓均价按标准定义仓位计算
+                if len(entries) == 3:
+
+                    p = 0
+
+                    for n in entries:
+
+                        p += entries[n][0] * entries[n][1]
+
+                # 非满仓操作
+                # 建仓均价按照操作次数平均值计算
+                else:
+
+                    p = 0
+
+                    for n in entries:
+
+                        p += entries[n][0]
+
+                    p = p / len(entries)
+
+                if self._placement == 'LONG':
+
+                    lost += self._stops[i][name][1] / p - 1
+
+                else:
+
+                    lost += p / self._stops[i][name][1] - 1
+
+        return lost
+
+
 
     def __del__(self):
         self._entries.clear()
