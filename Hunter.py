@@ -439,9 +439,11 @@ class Ten_Min_Candle_Container(Candle_Container):
             # 出现了属于中枢的笔被删除
             if pen_deleted < 10000:
 
-                if hubs.revert(pen_deleted) is True:
+                #if hubs.revert(pen_deleted) is True:
 
-                    print('中枢修正:', len(self.container) - 1)
+                #    print('中枢修正:', len(self.container) - 1)
+
+                hubs.revert(pen_deleted)
 
             # K线生成事件注入
             can = monitor.genEvent(Event.Monitor.K_GEN)
@@ -1425,6 +1427,9 @@ class Hub:
         self.e_pen_index = e_pen_index
 
         # 2016-08-04
+        # 标识中枢是否第一次出现第三类买卖点
+        # 第三类买卖点是一个临时状态，如果随后笔的延伸重新回到中枢内部，那会形成中枢延伸
+        # 当中枢延伸确认的时候此标识复位，等待下一次临时状态出现
         self._grow = False
 
     # 2016-05-16
@@ -1960,6 +1965,7 @@ class Hub_Container:
         hub_ZD = hub.ZD
 
         # 初始化索引为当前中枢后一笔
+        # 注意这个笔不属于任何中枢
         i = self.last_hub_end_pen_index + 1
 
         if i < self.pens.pens_index:
@@ -1970,21 +1976,29 @@ class Hub_Container:
             min_high = min(hub_ZG, pen_high)
             max_low = max(hub_ZD, pen_low)
 
-            # 存在交集
+            # 中枢后一笔与中枢存在交集
             if min_high >= max_low:
 
+                # 此笔有至少4根K线
+                # 笔的形态满足顶底分形最顶底的条件
                 if self.pens.container[i].legal() is True and self.pens.illPen(self.pens.container[i]) is True:
 
                     i += 1
 
+                    # 向后取一笔
+                    # 此笔有至少4根K线
+                    # 笔的形态满足顶底分形最顶底的条件
                     try:
                         if self.pens.container[i].legal() is True and self.pens.illPen(self.pens.container[i]) is True:
 
+                            # 取笔高低点
                             k_h = self.pens.container[i].endType.candle.getHigh()
                             k_l = self.pens.container[i].endType.candle.getLow()
 
+                            # 向上中枢采用笔的低点和中枢高点比较
                             if hub.pos == 'Up':
 
+                                # hub._grow 为True说明是第一次第三类买卖点
                                 if k_l >= hub_ZG and hub._grow is True:
 
                                     hub._grow = False

@@ -557,6 +557,9 @@ class S2:
 
         self._id += 1
 
+        # 重新注册建仓策略处理
+        #self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.enter)
+
     # 2016-08-01
     # 对中枢确认的辅助条件,根据具体认为的情况设定
     # 当前为确认中枢临时第4笔
