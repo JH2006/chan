@@ -14,7 +14,7 @@ import Hunter
 import Mining
 import Drawer
 import Currency
-import Strategy
+import Component
 import S1
 import Event
 
@@ -99,7 +99,7 @@ def test_month_10(market, year, month, count=0, skips=0):
     hubs = Hunter.Ten_Min_Hub_Container(pens)
 
     # 初始化Tran_Container对象
-    trans = Hunter.Tran_Container()
+    # trans = Hunter.Tran_Container()
 
     #s1 = S1.S1(candles.container,types.container,pens.container,hubs.container)
 
@@ -109,22 +109,27 @@ def test_month_10(market, year, month, count=0, skips=0):
 
     candles.loadDB(year, month, count, skips, types, pens, hubs, m)
 
-    #S1.S1._trans.clear()
-    #S1.S2._trans.clear()
-
     ax_1 = plt.subplot(1, 1, 1)
 
     drawer = Drawer.Ten_Min_Drawer(candles.container)
 
-    drawer.draw_stocks(candles.container, types.container, ax_1, trans)
+    drawer.draw_stocks(candles.container, types.container, ax_1)
 
     drawer.draw_pens(pens.container, ax_1)
 
     drawer.draw_hub(hubs.container, hubs, ax_1)
 
-    #for _, hub in enumerate(hubs.container):
+    df_2 = pd.DataFrame(Component.Tran.archive(s2._trans))
 
-    #    print(hub.pens())
+    file = '2005_2_AUD.xlsx'
+
+    writer = pd.ExcelWriter(file, engine='xlsxwriter')
+
+    df_2.to_excel(writer)
+
+    writer.close()
+
+    s2._trans.clear()
 
     plt.show()
 
@@ -150,37 +155,33 @@ def test_year(year, m1, m2):
 
     hubs = Hunter.Ten_Min_Hub_Container(pens)
 
-    # 初始化Tran_Container对象
-    trans = Hunter.Tran_Container()
-
-    #s1 = S1.S1(candles.container,types.container,pens.container,hubs.container)
-
-    #s_b = S1_B.S(candles.container,types.container,pens.container,hubs.container)
-
     s2 = S1.S2()
 
     m = Event.Monitor(s2)
+
+    c = []
 
     # 逐月调用
     for i in range(m1, m2+1):
 
         candles.loadDB(year, i, 0, 0, types, pens, hubs, m)
 
-    """
-    # 统一打印一年的结果
-    trans.printing()
+        c.extend(Component.Tran.archive(s2._trans))
 
-    trans.reset()
+        s2._trans.clear()
 
-    # 中枢信息挖掘
-    hubMining = Mining.Hub_Mining(hubs, candles)
+    df_2 = pd.DataFrame(c)
 
-    hubMining.mining()
+    file = '2005_AUD.xlsx'
 
-    file = 'AUD_' + str(year) + '.xlsx'
+    writer = pd.ExcelWriter(file, engine='xlsxwriter')
 
-    hubMining.save(file)
-    """
+    df_2.to_excel(writer)
+
+    writer.close()
+
+    c.clear()
+
 
 def test_month_5(market, year, month, count=0, skips=0):
 
@@ -235,17 +236,8 @@ def test_years(market, year_1, year_2):
 
 if __name__ == '__main__':
 
-    test_month_10('', 2015, 9)
-
-    #for i in range(2005, 2006):
-    #    test_year(i, 1, 12)
-
-    #df_2 = pd.DataFrame(S1.S2._trans)
-
-    #file = 'CAD.xlsx'
-
-    #writer = pd.ExcelWriter(file, engine='xlsxwriter')
-
-    #df_2.to_excel(writer)
-
-    #writer.close()
+    test_month_10('', 2005, 2)
+    #
+    # for i in range(2005, 2006):
+    #
+    #     test_year(i, 1, 3)

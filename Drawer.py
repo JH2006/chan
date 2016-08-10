@@ -40,7 +40,7 @@ class Ten_Min_Drawer:
 
     # 画K线算法.内部采用了双层遍历,算法简单,但性能一般
 
-    def draw_stocks(self, candles, types, ax_1, trans):
+    def draw_stocks(self, candles, types, ax_1):
 
         piexl_x = []
 

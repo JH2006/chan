@@ -255,7 +255,7 @@ class S2:
         self._trans = {}
 
         # 交易编码
-        self._id = 0
+        self._id = -1
 
         # 当下中枢
         self._curHub = None
@@ -340,7 +340,7 @@ class S2:
 
                 p = 'LONG'
 
-            self._eTran = Component.Tran(self._id, p)
+            self._eTran = Component.Tran(self._id, p, hub.ZG, hub.ZD)
 
         event._dict['TRAN'] = self._eTran
 
@@ -411,25 +411,25 @@ class S2:
 
                     entries = self._eTran._stops[len(self._eTran._stops) - 1][Component.StopExit._name][0]
 
-                    for name in entries:
+                    for t in entries:
 
-                        print('止损对象:', name, '成交价:', entries[name][0])
+                        print('止损对象:', t, '成交价:', entries[t][0])
 
                     if len(entries) == len(self._entries):
 
                         p = 0
 
-                        for name in entries:
+                        for i in entries:
 
-                            p += entries[name][0] * entries[name][1]
+                            p += entries[i][0] * entries[i][1]
                         
                     else:
 
                         p = 0
 
-                        for name in entries:
+                        for n in entries:
 
-                            p += entries[name][0]
+                            p += entries[n][0]
 
                         p = p / len(entries)
 
@@ -528,10 +528,6 @@ class S2:
         last_k_post = event._dict['LENOFK']
 
         print('新中枢ID:', event._dict['hub_id'], ' 中枢确认K线:', hub_k_pos, ' 当下K线:', last_k_post, ' 方向:', curHub.pos)
-
-        if hub_k_pos == 1480:
-
-            print('')
 
         # 关闭建仓处理
         self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)

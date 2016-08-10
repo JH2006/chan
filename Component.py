@@ -204,7 +204,8 @@ class StepEntry(Entries):
                     m_l = max(low, hub.ZD)
 
                     # 充分笔和中枢有交集
-                    if m_h > m_l:
+                    # 并且当下K线低点高于中枢高点
+                    if m_h > m_l and k.getLow() > hub.ZG:
 
                         return True
 
@@ -222,7 +223,7 @@ class StepEntry(Entries):
                     m_h = min(high, hub.ZG)
                     m_l = max(low, hub.ZD)
 
-                    if m_h > m_l:
+                    if m_h > m_l and k.getHigh() < hub.ZD:
 
                         return True
 
@@ -447,9 +448,12 @@ class EdgeExit(Exits):
 
 class Tran:
 
-    def __init__(self, id, p):
+    def __init__(self, id, p, ZG, ZD):
 
         self._id = id
+
+        self._hub_ZG = ZG
+        self._hub_ZD = ZD
 
         # long or short
         self._placement = p
@@ -557,7 +561,209 @@ class Tran:
 
         return lost
 
+    @staticmethod
+    def archive(trans):
 
+        tran = []
+
+        buf = []
+
+        for i in trans:
+
+            # 从止损记录列表开始
+            for _, stop in enumerate(trans[i]._stops):
+
+                # 读取一条止损记录
+                for name in stop:
+
+                    # 基础信息填充
+                    buf.append(trans[i]._id)
+                    buf.append(trans[i]._hub_ZG)
+                    buf.append(trans[i]._hub_ZD)
+                    buf.append(trans[i]._placement)
+
+                    # 读取止损记录中的建仓记录
+                    entries = stop[name][0]
+
+                    # 填充建仓信息
+                    try:
+
+                        buf.append(entries['MID_ENTRY'][0])
+
+                    except KeyError:
+
+                        buf.append(0)
+
+                    try:
+
+                        buf.append(entries['EDGE_ENTRY'][0])
+
+                    except KeyError:
+
+                        buf.append(0)
+
+                    try:
+
+                        buf.append(entries['STEP_ENTRY'][0])
+
+                    except KeyError:
+
+                        buf.append(0)
+
+                    # 填充平仓交易信息
+                    # 目前仅有两类平仓策略所以直接操作队列
+                    buf.append(0)
+                    buf.append(0)
+
+                    # 填充止损价位
+                    buf.append(stop[name][1])
+
+                    # Gain/Loss计算
+                    # 满仓操作
+                    # 建仓均价按标准定义仓位计算
+                    if len(entries) == 3:
+
+                        p = 0
+
+                        for n in entries:
+
+                            p += entries[n][0] * entries[n][1]
+
+                    # 非满仓操作
+                    # 建仓均价按照操作次数平均值计算
+                    else:
+
+                        p = 0
+
+                        for n in entries:
+
+                            p += entries[n][0]
+
+                        p = p / len(entries)
+
+                    if trans[i]._placement == 'LONG':
+
+                        buf.append(stop[name][1] / p - 1)
+
+                    else:
+
+                        buf.append(p / stop[name][1] - 1)
+
+                    tran.append(copy.deepcopy(buf))
+
+                    buf.clear()
+
+            # 有成功建仓/平仓记录
+            if len(trans[i]._entries) != 0:
+
+                # 基础信息填充
+                buf.append(trans[i]._id)
+                buf.append(trans[i]._hub_ZG)
+                buf.append(trans[i]._hub_ZD)
+                buf.append(trans[i]._placement)
+
+                # 填充建仓信息
+                try:
+
+                    buf.append(trans[i]._entries['MID_ENTRY'][0])
+
+                except KeyError:
+
+                    buf.append(0)
+
+                try:
+
+                    buf.append(trans[i]._entries['EDGE_ENTRY'][0])
+
+                except KeyError:
+
+                    buf.append(0)
+
+                try:
+
+                    buf.append(trans[i]._entries['STEP_ENTRY'][0])
+
+                except KeyError:
+
+                    buf.append(0)
+
+
+                # 填充平仓信息
+                try:
+
+                    buf.append(trans[i]._exits['MID_EXIT'][0])
+
+                except KeyError:
+
+                    buf.append(0)
+
+                try:
+
+                    buf.append(trans[i]._exits['EDGE_EXIT'][0])
+
+                except KeyError:
+
+                    buf.append(0)
+
+                # 止损信息填充
+                buf.append(0)
+
+                # 计算建仓均价
+                e = 0
+
+                # 计算平仓均价
+                x = 0
+
+                # 满仓操作
+                # 建仓均价按标准定义仓位计算
+                if len(trans[i]._entries) == 3:
+
+                    for n in trans[i]._entries:
+
+                        e += trans[i]._entries[n][0] * trans[i]._entries[n][1]
+
+                # 非满仓操作
+                # 建仓均价按照操作次数平均值计算
+                else:
+
+                    for n in trans[i]._entries:
+
+                        e += trans[i]._entries[n][0]
+
+                    e = e / len(trans[i]._entries)
+
+                for n in trans[i]._exits:
+
+                    x += trans[i]._exits[n][0]
+
+                # 异常情况出现在未来得及平仓
+                try:
+
+                    x = x / len(trans[i]._exits)
+
+                except ZeroDivisionError:
+
+                    x = 0
+
+                try:
+
+                    if trans[i]._placement == 'LONG':
+
+                        buf.append(x / e - 1)
+
+                    else:
+
+                        buf.append(e / x - 1)
+
+                except ZeroDivisionError:
+
+                    buf.append(0)
+
+                tran.append(copy.deepcopy(buf))
+
+                buf.clear()
+
+        return tran
 
     def __del__(self):
         self._entries.clear()
