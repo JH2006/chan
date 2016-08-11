@@ -568,7 +568,7 @@ class Tran:
 
         buf = []
 
-        for i in trans:
+        for _, i in enumerate(trans):
 
             # 从止损记录列表开始
             for _, stop in enumerate(trans[i]._stops):
@@ -745,7 +745,7 @@ class Tran:
 
                     x = 0
 
-                try:
+                if x != 0:
 
                     if trans[i]._placement == 'LONG':
 
@@ -755,7 +755,7 @@ class Tran:
 
                         buf.append(e / x - 1)
 
-                except ZeroDivisionError:
+                else:
 
                     buf.append(0)
 

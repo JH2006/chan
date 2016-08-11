@@ -477,7 +477,7 @@ class Ten_Min_Candle_Container(Candle_Container):
             # 修正中枢边界
             hubs.modHub()
 
-            # 中枢生成事件注入
+            ## 中枢生成事件注入
             if single == 1:
 
                 born = monitor.genEvent(Event.Monitor.HUB_GEN)
@@ -511,21 +511,21 @@ class Ten_Min_Candle_Container(Candle_Container):
                 # 判断是否出现第三类买卖点
                 if hubs.isGrow():
 
-                    born = monitor.genEvent(Event.Monitor.STOP)
+                    stop = monitor.genEvent(Event.Monitor.STOP)
 
                     try:
 
                         # 当下K线
-                        born._dict['K'] = self.container[len(self.container) - 1]
+                        stop._dict['K'] = self.container[len(self.container) - 1]
 
                         # 当下K线队列长度
-                        born._dict['LENOFK'] = len(self.container) - 1
+                        stop._dict['LENOFK'] = len(self.container) - 1
 
                     except KeyError:
 
                         pass
 
-                    monitor._e.put(born)
+                    monitor._e.put(stop)
 
                     sleep(0.002)
 
@@ -1777,14 +1777,14 @@ class Hub_Container:
             return False
 
         # 中枢前三笔不做处理
-        if pen_deleted - 2 < pen_index + self.hub_width:
+        #if pen_deleted - 2 < pen_index + self.hub_width:
 
-            # print('中枢前三笔不做处理')
+        #    print('中枢前三笔不做处理')
 
-            return False
+        #    return False
 
         # 笔没有落在当前中枢范围内
-        elif pen_deleted < hub.s_pen_index or pen_deleted > hub.e_pen_index:
+        if pen_deleted < hub.s_pen_index or pen_deleted > hub.e_pen_index:
 
             # print('笔没有落在当前中枢范围内')
 
@@ -1826,9 +1826,6 @@ class Hub_Container:
             hub =  self.container[self.size() - 1]
             pen_index = hub.s_pen_index
 
-            ZG = hub.ZG
-            ZD = hub.ZD
-
         except IndexError:
 
             return False
@@ -1847,12 +1844,17 @@ class Hub_Container:
 
             return False
 
-        hub.ZG = min(h)
-        hub.ZD = max(l)
+        ZG = min(h)
+        ZD = max(l)
 
         if ZG != hub.ZG or ZD != hub.ZD:
 
-            return True
+            if ZG > ZD:
+
+                hub.ZG = ZG
+                hub.ZD = ZD
+
+                return True
 
         else:
 

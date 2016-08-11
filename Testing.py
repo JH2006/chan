@@ -98,11 +98,6 @@ def test_month_10(market, year, month, count=0, skips=0):
 
     hubs = Hunter.Ten_Min_Hub_Container(pens)
 
-    # 初始化Tran_Container对象
-    # trans = Hunter.Tran_Container()
-
-    #s1 = S1.S1(candles.container,types.container,pens.container,hubs.container)
-
     s2 = S1.S2()
 
     m = Event.Monitor(s2)
@@ -121,7 +116,7 @@ def test_month_10(market, year, month, count=0, skips=0):
 
     df_2 = pd.DataFrame(Component.Tran.archive(s2._trans))
 
-    file = '2005_2_AUD.xlsx'
+    file = '2005_' + str(month) + '_AUD.xlsx'
 
     writer = pd.ExcelWriter(file, engine='xlsxwriter')
 
@@ -168,9 +163,9 @@ def test_year(year, m1, m2):
 
         c.extend(Component.Tran.archive(s2._trans))
 
-        s2._trans.clear()
+        s2._id = 0
 
-    df_2 = pd.DataFrame(c)
+    df_2 = pd.DataFrame(c, columns = ['ID', 'TRAN ID', 'ZG', 'ZD','MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STOP', 'GAIN'])
 
     file = '2005_AUD.xlsx'
 
@@ -232,12 +227,12 @@ def test_years(market, year_1, year_2):
 
     for y in range(year_1, year_2+1):
 
-        test_year(market, y, 1, 12)
+        test_year(market, y, 1, 11)
 
 if __name__ == '__main__':
 
     test_month_10('', 2005, 2)
-    #
-    # for i in range(2005, 2006):
-    #
-    #     test_year(i, 1, 3)
+    
+    #for i in range(2005, 2006):
+    
+    #    test_year(i, 2, 2)

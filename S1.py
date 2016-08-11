@@ -321,11 +321,12 @@ class S2:
         if hub.pos == '--':
             return
 
-        # 建仓记录总数与注册的建仓策略数相同，说明平仓完全执行，直接退出
+        # 建仓记录总数与注册的建仓策略数相同，说明建仓完全执行，直接退出
         try:
             if len(self._eTran._entries) == len(self._entries):
                 return
 
+        # 当eTran仍然为None是异常捕获
         except AttributeError:
             pass
 
@@ -395,8 +396,21 @@ class S2:
     def stop(self, event):
 
         # 仓位为空，或者没有形成建仓条件，或者已经被止损平仓，没有继续止损需求，直接退出
-        if len(self._eTran._entries) == 0:
-            return
+        try:
+
+            try:
+
+                if len(self._eTran._entries) == 0:
+
+                    return
+
+            except AttributeError:
+                
+                return
+
+        except BaseException:
+
+            pass
 
         # 当下的交易
         event._dict['TRAN'] = self._eTran
@@ -487,43 +501,6 @@ class S2:
 
         curHub = event._dict['HUB']
 
-        # 每次产生新中枢的时候都对上一个中枢是否有发生交易做判断
-        # if not self._isTraded:
-        #
-        #     preHub = self._curHub
-        #
-        #     try:
-        #
-        #         if preHub.ZD > curHub.ZG:
-        #
-        #             event.dict['hub'].pos = 'Down'
-        #
-        #         elif preHub.ZG < curHub.ZD:
-        #
-        #             event.dict['hub'].pos = 'Up'
-        #
-        #         elif preHub.ZG < curHub.ZG and preHub.ZG > curHub.ZD:
-        #
-        #             event.dict['hub'].pos = 'Up'
-        #
-        #         elif preHub.ZD < curHub.ZG and preHub.ZD > curHub.ZD:
-        #
-        #             event.dict['hub'].pos = 'Down'
-        #
-        #         else:
-        #
-        #             if preHub.pos == 'Down':
-        #
-        #                 event._dict['hub'].pos = 'Up'
-        #
-        #             else:
-        #
-        #                 event._dict['hub'].pos = 'Down'
-        #
-        #     except KeyError:
-        #
-        #         pass
-
         hub_k_pos = curHub.e_pen.endType.candle_index
         last_k_post = event._dict['LENOFK']
 
@@ -603,13 +580,13 @@ class S2:
 
     def __del__(self):
 
-        self._trans.clear()
+        self._trans = None
 
-        self._entries.clear()
+        self._entries = None
 
-        self._exits.clear()
+        self._exits = None
 
-        self._stops.clear()
+        self._stops = None
 
 
 
