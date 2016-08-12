@@ -396,21 +396,10 @@ class S2:
     def stop(self, event):
 
         # 仓位为空，或者没有形成建仓条件，或者已经被止损平仓，没有继续止损需求，直接退出
-        try:
+        if len(self._eTran._entries) == 0:
 
-            try:
+            return
 
-                if len(self._eTran._entries) == 0:
-
-                    return
-
-            except AttributeError:
-                
-                return
-
-        except BaseException:
-
-            pass
 
         # 当下的交易
         event._dict['TRAN'] = self._eTran
@@ -510,7 +499,7 @@ class S2:
         self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)
 
         # 关闭止损处理
-        self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.stop)
+        self._monitor._e.unregister(Event.Monitor.STOP, self._monitor.stop)
 
         # 注册中枢确认附件条件处理
         self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.tradeCommit)
