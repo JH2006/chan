@@ -10,7 +10,7 @@ class Entries:
 
     def __init__(self, position):
 
-        self._position = position
+        self._position = position 
 
     def signaling(self, event):
 
@@ -190,7 +190,7 @@ class StepEntry(Entries):
         if hub.pos == 'Up' and last_type.getPos() == 'Up':
 
             # 向上分型高于中枢高点
-            if last_type.candle.getLow() >= hub.ZG:
+            if last_type.candle.getLow() > hub.ZG:
 
                 last_revert_type = types.container[len(types.container) - 2]
 
@@ -211,7 +211,7 @@ class StepEntry(Entries):
 
         elif hub.pos == 'Down' and last_type.getPos() == 'Down':
 
-            if last_type.candle.getHigh() <= hub.ZD:
+            if last_type.candle.getHigh() < hub.ZD:
 
                 last_revert_type = types.container[len(types.container) - 2]
 
@@ -273,7 +273,6 @@ class StepExit(Exits):
 
         self._name = StepExit._name
 
-
     def signaling(self, event):
 
         try:
@@ -282,8 +281,14 @@ class StepExit(Exits):
             k = event._dict['K']
             types = event._dict['TYPES']
             candles = event._dict['CANDLES']
+            tran = event._dict['TRAN']
 
         except KeyError:
+
+            return False
+
+        # 仓位已满
+        if EdgeExit._name in tran._exits and MidExit._name in tran._exits:
 
             return False
 
@@ -292,8 +297,8 @@ class StepExit(Exits):
         # 向上中枢以向下分型终结
         if hub.pos == 'Up' and last_type.getPos() == 'Down':
 
-            # 向下分型高于中枢高点
-            if last_type.candle.getHigh() <= hub.ZD:
+            # 向下分型低于中枢低点
+            if last_type.candle.getHigh() < hub.ZD:
 
                 last_revert_type = types.container[len(types.container) - 2]
 
@@ -307,12 +312,56 @@ class StepExit(Exits):
                     m_l = max(low, hub.ZD)
 
                     # 充分笔和中枢有交集
-                    # 并且当下K线低点高于中枢高点
+                    # 并且当下K线的高点低于中枢低点
+                    if m_h > m_l and k.getHigh() < hub.ZD:
+
+                        return True
+
+        # 向下中枢以向上分型终结
+        # 向上分型高于中枢高点
+        elif hub.pos == 'Down' and last_type.getPos() == 'Up':
+
+            # 向上分型高于中枢高点
+            if last_type.candle.getHigh() <= hub.ZD:
+
+                last_revert_type = types.container[len(types.container) - 2]
+
+                if last_type.candle_index - last_revert_type.candle_index >= 4:
+
+                    high = candles.container[last_type.candle_index -1].getHigh()
+                    low = candles.container[last_revert_type.candle_index].getLow()
+
+                    m_h = min(high, hub.ZG)
+                    m_l = max(low, hub.ZD)
+
                     if m_h > m_l and k.getLow() > hub.ZG:
 
                         return True
 
-        return super().signaling(event)
+        return False
+
+    def order(self, event):
+
+        tran = event._dict['TRAN']
+
+        # 通过Key确保每个策略仅执行一次
+        if StepExit._name not in tran._exits:
+
+            if self.signaling(event):
+
+                # 仅当EdgeExit为空并且MidExit已经被执行之后才执行
+                if EdgeExit._name not in tran._exits:
+
+                    k = event._dict['K']
+                    point = k.getClose()
+
+                    tran._exits[StepExit._name] = (point, self._position)
+
+                return True
+
+        return False
+
+        
 class StopExit(Exits):
 
     _name = 'STOP_EXIT'
@@ -365,8 +414,14 @@ class MidExit(Exits):
 
             hub = event._dict['HUB']
             k = event._dict['K']
+            tran = event._dict['TRAN']
 
         except KeyError:
+
+            return False
+
+        # 仓位已满
+        if StepExit._name in tran._exits and EdgeExit._name in tran._exits:
 
             return False
 
@@ -432,6 +487,11 @@ class EdgeExit(Exits):
             tran =  event._dict['TRAN']
 
         except KeyError:
+
+            return False
+
+        # 仓位已满
+        if StepExit._name in tran._exits and MidExit._name in tran._exits:
 
             return False
 
@@ -661,7 +721,8 @@ class Tran:
                         buf.append(0)
 
                     # 填充平仓交易信息
-                    # 目前仅有两类平仓策略所以直接操作队列
+                    # 目前平仓策略直接操作队列
+                    buf.append(0)
                     buf.append(0)
                     buf.append(0)
 
@@ -754,6 +815,15 @@ class Tran:
                 except KeyError:
 
                     buf.append(0)
+
+                try:
+
+                    buf.append(trans[i]._exits['STEP_EXIT'][0])
+
+                except KeyError:
+
+                    buf.append(0)
+
 
                 # 止损信息填充
                 buf.append(0)

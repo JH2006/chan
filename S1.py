@@ -309,6 +309,8 @@ class S2:
 
         self._exits[Component.EdgeExit._name] = Component.EdgeExit(0.5)
 
+        self._exits[Component.StepExit._name] = Component.StepExit(0.5)
+
     def loadStop(self):
 
         self._stops[Component.StopExit._name] = Component.StopExit(1)
@@ -376,7 +378,7 @@ class S2:
 
                 if __debug__:
 
-                    if len(self._xTran._exits) == len(self._exits):
+                    if len(self._xTran._exits) == len(self._exits) - 1:
 
                         print('***********************')
                         print('Tran ID:', self._xTran._id, ' 完成!!!')

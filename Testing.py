@@ -104,17 +104,17 @@ def test_month_10(market, year, month, count=0, skips=0):
 
     candles.loadDB(year, month, count, skips, types, pens, hubs, m)
 
-    #ax_1 = plt.subplot(1, 1, 1)
+    ax_1 = plt.subplot(1, 1, 1)
 
-    #drawer = Drawer.Ten_Min_Drawer(candles.container)
+    drawer = Drawer.Ten_Min_Drawer(candles.container)
 
-    #drawer.draw_stocks(candles.container, types.container, ax_1)
+    drawer.draw_stocks(candles.container, types.container, ax_1)
 
-    #drawer.draw_pens(pens.container, ax_1)
+    drawer.draw_pens(pens.container, ax_1)
 
-    #drawer.draw_hub(hubs.container, hubs, ax_1)
+    drawer.draw_hub(hubs.container, hubs, ax_1)
 
-    df_2 = pd.DataFrame(Component.Tran.archive(s2._trans))
+    df_2 = pd.DataFrame(Component.Tran.archive(s2._trans), columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STEP_EXIT', 'STOP', 'GAIN'])
 
     file = '2005_' + str(month) + '_AUD.xlsx'
 
@@ -126,7 +126,7 @@ def test_month_10(market, year, month, count=0, skips=0):
 
     s2._trans.clear()
 
-    #plt.show()
+    plt.show()
 
 
 def test_year(year, m1, m2):
@@ -208,22 +208,22 @@ if __name__ == '__main__':
 
     #for m in range(1, 12):
 
-    #    test_month_10('', 2005, m)
+    test_month_10('', 2005, 2)
     
-    t = []
-    for i in range(2005, 2015):
+    #t = []
+    #for i in range(2005, 2015):
     
-        t.extend(test_year(i, 1, 12))
+    #    t.extend(test_year(i, 1, 12))
 
-    df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STOP', 'GAIN'])
+    #df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STEP_EXIT', 'STOP', 'GAIN'])
 
-    file = '2005_AUD.xlsx'
+    #file = '2005_AUD.xlsx'
 
-    writer = pd.ExcelWriter(file, engine='xlsxwriter')
+    #writer = pd.ExcelWriter(file, engine='xlsxwriter')
 
-    df_2.to_excel(writer)
+    #df_2.to_excel(writer)
 
-    writer.close()
+    #writer.close()
 
-    t = None
+    #t = None
 
