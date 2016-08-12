@@ -263,6 +263,56 @@ class Exits:
 
         pass
 
+class StepExit(Exits):
+
+    _name = 'STEP_EXIT'
+
+    def __init__(self, position):
+
+        Exits.__init__(self, position)
+
+        self._name = StepExit._name
+
+
+    def signaling(self, event):
+
+        try:
+
+            hub = event._dict['HUB']
+            k = event._dict['K']
+            types = event._dict['TYPES']
+            candles = event._dict['CANDLES']
+
+        except KeyError:
+
+            return False
+
+        last_type = types.container[len(types.container) - 1]
+
+        # 向上中枢以向下分型终结
+        if hub.pos == 'Up' and last_type.getPos() == 'Down':
+
+            # 向下分型高于中枢高点
+            if last_type.candle.getHigh() <= hub.ZD:
+
+                last_revert_type = types.container[len(types.container) - 2]
+
+                # 两个相邻分型间有额外三个K线，构成笔充分条件
+                if last_type.candle_index - last_revert_type.candle_index >= 4:
+
+                    low = candles.container[last_type.candle_index -1].getLow()
+                    high = candles.container[last_revert_type.candle_index].getHigh()
+
+                    m_h = min(high, hub.ZG)
+                    m_l = max(low, hub.ZD)
+
+                    # 充分笔和中枢有交集
+                    # 并且当下K线低点高于中枢高点
+                    if m_h > m_l and k.getLow() > hub.ZG:
+
+                        return True
+
+        return super().signaling(event)
 class StopExit(Exits):
 
     _name = 'STOP_EXIT'

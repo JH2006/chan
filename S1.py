@@ -301,7 +301,7 @@ class S2:
 
         self._entries[Component.EdgeEntry._name] = Component.EdgeEntry(0.3)
 
-        self._entries[Component.StepEntry._name] = Component.StepEntry(0.4)
+        #self._entries[Component.StepEntry._name] = Component.StepEntry(0.4)
 
     def loadExit(self):
 

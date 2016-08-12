@@ -104,15 +104,15 @@ def test_month_10(market, year, month, count=0, skips=0):
 
     candles.loadDB(year, month, count, skips, types, pens, hubs, m)
 
-    ax_1 = plt.subplot(1, 1, 1)
+    #ax_1 = plt.subplot(1, 1, 1)
 
-    drawer = Drawer.Ten_Min_Drawer(candles.container)
+    #drawer = Drawer.Ten_Min_Drawer(candles.container)
 
-    drawer.draw_stocks(candles.container, types.container, ax_1)
+    #drawer.draw_stocks(candles.container, types.container, ax_1)
 
-    drawer.draw_pens(pens.container, ax_1)
+    #drawer.draw_pens(pens.container, ax_1)
 
-    drawer.draw_hub(hubs.container, hubs, ax_1)
+    #drawer.draw_hub(hubs.container, hubs, ax_1)
 
     df_2 = pd.DataFrame(Component.Tran.archive(s2._trans))
 
@@ -126,19 +126,8 @@ def test_month_10(market, year, month, count=0, skips=0):
 
     s2._trans.clear()
 
-    plt.show()
+    #plt.show()
 
-    """
-    trans.printing()
-
-    trans.reset()
-
-    hubMining = Mining.Hub_Mining(hubs, candles)
-
-    hubMining.mining()
-
-    hubMining.save('AUD_2015_4.xlsx')
-    """
 
 def test_year(year, m1, m2):
 
@@ -165,17 +154,9 @@ def test_year(year, m1, m2):
 
         s2._id = 0
 
-    df_2 = pd.DataFrame(c, columns = ['ID', 'TRAN ID', 'ZG', 'ZD','MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STOP', 'GAIN'])
-
-    file = '2005_AUD.xlsx'
-
-    writer = pd.ExcelWriter(file, engine='xlsxwriter')
-
-    df_2.to_excel(writer)
-
-    writer.close()
-
-    c.clear()
+        s2._trans.clear()
+   
+    return c
 
 
 def test_month_5(market, year, month, count=0, skips=0):
@@ -223,16 +204,26 @@ def test_month_5(market, year, month, count=0, skips=0):
     hubMining.save('AUD_2015_9.xlsx')
     """
 
-def test_years(market, year_1, year_2):
-
-    for y in range(year_1, year_2+1):
-
-        test_year(market, y, 1, 11)
-
 if __name__ == '__main__':
 
-    test_month_10('', 2005, 2)
+    #for m in range(1, 12):
+
+    #    test_month_10('', 2005, m)
     
-    #for i in range(2005, 2006):
+    t = []
+    for i in range(2005, 2015):
     
-    #    test_year(i, 2, 2)
+        t.extend(test_year(i, 1, 12))
+
+    df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STOP', 'GAIN'])
+
+    file = '2005_AUD.xlsx'
+
+    writer = pd.ExcelWriter(file, engine='xlsxwriter')
+
+    df_2.to_excel(writer)
+
+    writer.close()
+
+    t = None
+
