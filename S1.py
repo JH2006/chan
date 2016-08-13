@@ -276,8 +276,11 @@ class S2:
 
         # 代表当下交易
         self._eTran = None
-        # 代表前一交易
+
+        # 待平仓交易
         self._xTran = None
+        # 待平仓交易队列
+        self._xTrans = []
 
         # Entries实体队列
         self._entries = {}
@@ -309,7 +312,7 @@ class S2:
 
         self._exits[Component.EdgeExit._name] = Component.EdgeExit(0.5)
 
-        self._exits[Component.StepExit._name] = Component.StepExit(0.5)
+        # self._exits[Component.StepExit._name] = Component.StepExit(0.5)
 
     def loadStop(self):
 
@@ -511,6 +514,7 @@ class S2:
             self._trans[self._id] = self._eTran
 
             self._xTran = self._trans[self._id]
+            # self._xTrans.append(self._trans[self._id])
 
             # 重新赋值eTran，准备开始新的建仓记录
             self._eTran = None
