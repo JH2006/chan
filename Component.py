@@ -347,21 +347,25 @@ class MidExit(Exits):
 
     def order(self, event):
 
-        tran = event._dict['TRAN']
+        trans = event._dict['TRAN']
 
-        # 通过Key确保每个策略仅执行一次
-        if MidExit._name not in tran._exits:
+        flag = False
 
-            if self.signaling(event):
+        for i, _ in enumerate(trans):
 
-                k = event._dict['K']
-                point = k.getClose()
+            # 通过Key确保每个策略仅执行一次
+            if MidExit._name not in trans[i]._exits:
 
-                tran._exits[MidExit._name] = (point, self._position)
+                if self.signaling(event):
 
-                return True
+                    k = event._dict['K']
+                    point = k.getClose()
 
-        return False
+                    trans[i]._exits[MidExit._name] = (point, self._position)
+
+                    flag = True
+
+        return flag
 
 class EdgeExit(Exits):
 
@@ -379,7 +383,7 @@ class EdgeExit(Exits):
 
             hub = event._dict['HUB']
             k = event._dict['K']
-            tran =  event._dict['TRAN']
+            tran = event._dict['T']
 
         except KeyError:
 
@@ -424,26 +428,32 @@ class EdgeExit(Exits):
 
     def order(self, event):
 
-        tran = event._dict['TRAN']
+        trans = event._dict['TRAN']
 
-        # 通过Key确保每个策略仅执行一次
-        if EdgeExit._name not in tran._exits:
+        flag = False
 
-            if self.signaling(event):
+        for i, _ in enumerate(trans):
 
-                k = event._dict['K']
-                point = k.getClose()
+            # 通过Key确保每个策略仅执行一次
+            if EdgeExit._name not in trans[i]._exits:
 
-                tran._exits[EdgeExit._name] = (point, self._position)
+                event._dict['T'] = trans[i]
 
-                # 首先触碰中枢边界，100%平仓
-                if MidExit._name not in tran._exits:
+                if self.signaling(event):
 
-                    tran._exits[MidExit._name] = (point, self._position)
+                    k = event._dict['K']
+                    point = k.getClose()
 
-                return True
+                    trans[i]._exits[EdgeExit._name] = (point, self._position)
 
-        return False
+                    # 首先触碰中枢边界，100%平仓
+                    if MidExit._name not in trans[i]._exits:
+
+                        trans[i]._exits[MidExit._name] = (point, self._position)
+
+                    flag = True
+
+        return flag
 
 
 class Tran:
