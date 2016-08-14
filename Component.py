@@ -10,7 +10,7 @@ class Entries:
 
     def __init__(self, position):
 
-        self._position = position 
+        self._position = position
 
     def signaling(self, event):
 
@@ -190,7 +190,7 @@ class StepEntry(Entries):
         if hub.pos == 'Up' and last_type.getPos() == 'Up':
 
             # 向上分型高于中枢高点
-            if last_type.candle.getLow() > hub.ZG:
+            if last_type.candle.getLow() >= hub.ZG:
 
                 last_revert_type = types.container[len(types.container) - 2]
 
@@ -211,7 +211,7 @@ class StepEntry(Entries):
 
         elif hub.pos == 'Down' and last_type.getPos() == 'Down':
 
-            if last_type.candle.getHigh() < hub.ZD:
+            if last_type.candle.getHigh() <= hub.ZD:
 
                 last_revert_type = types.container[len(types.container) - 2]
 
@@ -263,105 +263,6 @@ class Exits:
 
         pass
 
-class StepExit(Exits):
-
-    _name = 'STEP_EXIT'
-
-    def __init__(self, position):
-
-        Exits.__init__(self, position)
-
-        self._name = StepExit._name
-
-    def signaling(self, event):
-
-        try:
-
-            hub = event._dict['HUB']
-            k = event._dict['K']
-            types = event._dict['TYPES']
-            candles = event._dict['CANDLES']
-            tran = event._dict['TRAN']
-
-        except KeyError:
-
-            return False
-
-        # 仓位已满
-        if EdgeExit._name in tran._exits and MidExit._name in tran._exits:
-
-            return False
-
-        last_type = types.container[len(types.container) - 1]
-
-        # 向上中枢以向下分型终结
-        if hub.pos == 'Up' and last_type.getPos() == 'Down':
-
-            # 向下分型低于中枢低点
-            if last_type.candle.getHigh() < hub.ZD:
-
-                last_revert_type = types.container[len(types.container) - 2]
-
-                # 两个相邻分型间有额外三个K线，构成笔充分条件
-                if last_type.candle_index - last_revert_type.candle_index >= 4:
-
-                    low = candles.container[last_type.candle_index -1].getLow()
-                    high = candles.container[last_revert_type.candle_index].getHigh()
-
-                    m_h = min(high, hub.ZG)
-                    m_l = max(low, hub.ZD)
-
-                    # 充分笔和中枢有交集
-                    # 并且当下K线的高点低于中枢低点
-                    if m_h > m_l and k.getHigh() < hub.ZD:
-
-                        return True
-
-        # 向下中枢以向上分型终结
-        # 向上分型高于中枢高点
-        elif hub.pos == 'Down' and last_type.getPos() == 'Up':
-
-            # 向上分型高于中枢高点
-            if last_type.candle.getHigh() <= hub.ZD:
-
-                last_revert_type = types.container[len(types.container) - 2]
-
-                if last_type.candle_index - last_revert_type.candle_index >= 4:
-
-                    high = candles.container[last_type.candle_index -1].getHigh()
-                    low = candles.container[last_revert_type.candle_index].getLow()
-
-                    m_h = min(high, hub.ZG)
-                    m_l = max(low, hub.ZD)
-
-                    if m_h > m_l and k.getLow() > hub.ZG:
-
-                        return True
-
-        return False
-
-    def order(self, event):
-
-        tran = event._dict['TRAN']
-
-        # 通过Key确保每个策略仅执行一次
-        if StepExit._name not in tran._exits:
-
-            if self.signaling(event):
-
-                # 仅当EdgeExit为空并且MidExit已经被执行之后才执行
-                if EdgeExit._name not in tran._exits:
-
-                    k = event._dict['K']
-                    point = k.getClose()
-
-                    tran._exits[StepExit._name] = (point, self._position)
-
-                return True
-
-        return False
-
-        
 class StopExit(Exits):
 
     _name = 'STOP_EXIT'
@@ -446,25 +347,21 @@ class MidExit(Exits):
 
     def order(self, event):
 
-        trans = event._dict['TRAN']
+        tran = event._dict['TRAN']
 
-        flag = False
+        # 通过Key确保每个策略仅执行一次
+        if MidExit._name not in tran._exits:
 
-        for i, _ in enumerate(trans):
+            if self.signaling(event):
 
-            # 通过Key确保每个策略仅执行一次
-            if MidExit._name not in trans[i]._exits:
+                k = event._dict['K']
+                point = k.getClose()
 
-                if self.signaling(event):
+                tran._exits[MidExit._name] = (point, self._position)
 
-                    k = event._dict['K']
-                    point = k.getClose()
+                return True
 
-                    trans[i]._exits[MidExit._name] = (point, self._position)
-
-                    flag = True
-
-        return flag
+        return False
 
 class EdgeExit(Exits):
 
@@ -482,12 +379,11 @@ class EdgeExit(Exits):
 
             hub = event._dict['HUB']
             k = event._dict['K']
-            tran = event._dict['T']
+            tran =  event._dict['TRAN']
 
         except KeyError:
 
             return False
-
 
         high = k.getHigh()
         low = k.getLow()
@@ -528,32 +424,26 @@ class EdgeExit(Exits):
 
     def order(self, event):
 
-        trans = event._dict['TRAN']
+        tran = event._dict['TRAN']
 
-        flag = False
+        # 通过Key确保每个策略仅执行一次
+        if EdgeExit._name not in tran._exits:
 
-        for i, _ in enumerate(trans):
+            if self.signaling(event):
 
-            # 通过Key确保每个策略仅执行一次
-            if EdgeExit._name not in trans[i]._exits:
+                k = event._dict['K']
+                point = k.getClose()
 
-                event._dict['T'] = trans[i]
+                tran._exits[EdgeExit._name] = (point, self._position)
 
-                if self.signaling(event):
+                # 首先触碰中枢边界，100%平仓
+                if MidExit._name not in tran._exits:
 
-                    k = event._dict['K']
-                    point = k.getClose()
+                    tran._exits[MidExit._name] = (point, self._position)
 
-                    trans[i]._exits[EdgeExit._name] = (point, self._position)
+                return True
 
-                    # 首先触碰中枢边界，100%平仓
-                    if MidExit._name not in trans[i]._exits:
-
-                        trans[i]._exits[MidExit._name] = (point, self._position)
-
-                    flag = True
-
-        return flag
+        return False
 
 
 class Tran:
@@ -721,8 +611,7 @@ class Tran:
                         buf.append(0)
 
                     # 填充平仓交易信息
-                    # 目前平仓策略直接操作队列
-                    buf.append(0)
+                    # 目前仅有两类平仓策略所以直接操作队列
                     buf.append(0)
                     buf.append(0)
 
@@ -815,15 +704,6 @@ class Tran:
                 except KeyError:
 
                     buf.append(0)
-
-                try:
-
-                    buf.append(trans[i]._exits['STEP_EXIT'][0])
-
-                except KeyError:
-
-                    buf.append(0)
-
 
                 # 止损信息填充
                 buf.append(0)

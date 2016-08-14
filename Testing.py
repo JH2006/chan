@@ -215,7 +215,7 @@ if __name__ == '__main__':
     
         t.extend(test_year(i, 1, 12))
 
-    df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STEP_EXIT', 'STOP', 'GAIN'])
+    df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STOP', 'GAIN'])
 
     file = '2005_AUD.xlsx'
 
