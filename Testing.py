@@ -206,24 +206,24 @@ def test_month_5(market, year, month, count=0, skips=0):
 
 if __name__ == '__main__':
 
-    #for m in range(1, 12):
+    ##for m in range(1, 12):
 
-    test_month_10('', 2005, 1)
+    #test_month_10('', 2005, 2)
     
-    #t = []
-    #for i in range(2005, 2015):
+    t = []
+    for i in range(2005, 2015):
     
-    #    t.extend(test_year(i, 1, 12))
+        t.extend(test_year(i, 1, 12))
 
-    #df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STEP_EXIT', 'STOP', 'GAIN'])
+    df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STEP_EXIT', 'STOP', 'GAIN'])
 
-    #file = '2005_AUD.xlsx'
+    file = '2005_AUD.xlsx'
 
-    #writer = pd.ExcelWriter(file, engine='xlsxwriter')
+    writer = pd.ExcelWriter(file, engine='xlsxwriter')
 
-    #df_2.to_excel(writer)
+    df_2.to_excel(writer)
 
-    #writer.close()
+    writer.close()
 
-    #t = None
+    t = None
 

@@ -520,13 +520,17 @@ class S2:
         # 清理待平仓队列里面已经完成平仓的交易
         for i, _ in enumerate(self._xTrans):
 
-            print('待平仓队列长度:', len(self._xTrans))
-
             if len(self._xTrans[i]._exits) != 0:
 
                 print('待平仓队列清空:', self._xTrans[i]._id)
 
                 self._xTrans.pop(i)
+
+        if __debug__:
+
+            for i, _ in enumerate(self._xTrans):
+
+                print('待平仓交易:', self._xTrans[i]._id)
 
 
         # _eTran不为空说明前一中枢已经生成交易,或者已经被止损,或者等待平仓
@@ -538,6 +542,7 @@ class S2:
             if len(self._eTran._entries) != 0:
 
                 self._xTrans.append(self._trans[self._id])
+                print('进入待平仓队列:', self._eTran._id)
 
             # 重新赋值eTran，准备开始新的建仓记录
             self._eTran = None
