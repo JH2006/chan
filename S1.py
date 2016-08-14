@@ -277,8 +277,6 @@ class S2:
         # 代表当下交易
         self._eTran = None
 
-        # 待平仓交易
-        self._xTran = None
         # 待平仓交易队列
         self._xTrans = []
 
@@ -361,42 +359,53 @@ class S2:
 
     def exit(self, event):
 
-        # 仓位为空，或者没有形成建仓条件，或者已经被止损平仓，没有继续平仓需求，直接退出
-        if len(self._xTran._entries) == 0:
+        # 判断当前待平仓的交易是否有进一步调用平仓计算的必要
+        flag = False
+
+        for i, _ in enumerate(self._xTrans):
+
+            # 仓位不为空或者没被止损平仓，继续平仓需求
+            if len(self._xTrans[i]._entries) != 0:
+
+                # 平仓记录总数与注册的平仓策略数不相同，说明平仓还有平仓机会
+                if len(self._xTrans[i]._exits) != len(self._exits):
+
+                    flag = True
+
+                    break
+
+        if flag is not True:
+
             return
 
-        # 平仓记录总数与注册的平仓策略数相同，说明平仓完全执行，直接退出
-        if len(self._xTran._exits) == len(self._exits):
-            return
-
-        hub = event._dict['HUB']
-
-        event._dict['TRAN'] = self._xTran
+        event._dict['TRAN'] = self._xTrans
 
         for name in self._exits:
 
             if self._exits[name].order(event):
 
-                print('Tran ID:', self._xTran._id, ' 平仓类型:', name, ' 成交价:', self._xTran._exits[name][0], '  平仓K线:', event._dict['LENOFK'])
+                for j, _ in enumerate(self._xTrans):
 
-                if __debug__:
+                    print('Tran ID:', self._xTrans[j]._id, ' 平仓类型:', name, ' 成交价:', self._xTrans[j]._exits[name][0], '  平仓K线:', event._dict['LENOFK'])
 
-                    if len(self._xTran._exits) == len(self._exits) - 1:
+                    if __debug__:
 
-                        print('***********************')
-                        print('Tran ID:', self._xTran._id, ' 完成!!!')
+                        if len(self._xTrans[j]._exits) == len(self._exits):
 
-                        for name in self._xTran._entries:
+                            print('***********************')
+                            print('Tran ID:', self._xTrans[j]._id, ' 完成!!!')
 
-                            print('建仓类型:', name, ' 成交价:', self._xTran._entries[name][0], ' 仓位:', self._xTran._entries[name][1])
+                            for name in self._xTrans[j]._entries:
 
-                        for name in self._xTran._exits:
+                                print('建仓类型:', name, ' 成交价:', self._xTrans[j]._entries[name][0], ' 仓位:', self._xTrans[j]._entries[name][1])
 
-                            print('平仓类型:', name, ' 成交价:', self._xTran._exits[name][0], ' 仓位:', self._xTran._exits[name][1])
+                            for name in self._xTrans[j]._exits:
 
-                        print('总收益:', self._xTran.gain())
+                                print('平仓类型:', name, ' 成交价:', self._xTrans[j]._exits[name][0], ' 仓位:', self._xTrans[j]._exits[name][1])
 
-                        print('***********************')
+                            print('总收益:', self._xTrans[j].gain())
+
+                            print('***********************')
 
     def stop(self, event):
 
@@ -404,7 +413,6 @@ class S2:
         if len(self._eTran._entries) == 0:
 
             return
-
 
         # 当下的交易
         event._dict['TRAN'] = self._eTran
@@ -509,12 +517,27 @@ class S2:
         # 注册中枢确认附件条件处理
         self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.tradeCommit)
 
+        # 清理待平仓队列里面已经完成平仓的交易
+        for i, _ in enumerate(self._xTrans):
+
+            print('待平仓队列长度:', len(self._xTrans))
+
+            if len(self._xTrans[i]._exits) != 0:
+
+                print('待平仓队列清空:', self._xTrans[i]._id)
+
+                self._xTrans.pop(i)
+
+
+        # _eTran不为空说明前一中枢已经生成交易,或者已经被止损,或者等待平仓
         if self._eTran is not None:
 
             self._trans[self._id] = self._eTran
 
-            self._xTran = self._trans[self._id]
-            # self._xTrans.append(self._trans[self._id])
+            #  如果建仓队列不为空,才有等待平仓的可能
+            if len(self._eTran._entries) != 0:
+
+                self._xTrans.append(self._trans[self._id])
 
             # 重新赋值eTran，准备开始新的建仓记录
             self._eTran = None
@@ -524,9 +547,6 @@ class S2:
             self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.exit)
 
         self._id += 1
-
-        # 重新注册建仓策略处理
-        #self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.enter)
 
     # 2016-08-01
     # 对中枢确认的辅助条件,根据具体认为的情况设定

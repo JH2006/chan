@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     #for m in range(1, 12):
 
-    test_month_10('', 2005, 2)
+    test_month_10('', 2005, 1)
     
     #t = []
     #for i in range(2005, 2015):
