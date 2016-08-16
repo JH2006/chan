@@ -109,7 +109,6 @@ class EventEngine(object):
         """向事件队列中存入事件"""
         self.__queue.put(event)
 
-
 ########################################################################
 class Event:
     """事件对象"""
@@ -184,9 +183,9 @@ class Monitor:
         pass
 
     # 跟踪中枢第四笔确认点
-    def tradeCommit(self, event):
+    def trade_commit(self, event):
 
-        self._s.tradeCommit(event)
+        self._s.trade_commit(event)
 
     def genEvent(self, event):
 

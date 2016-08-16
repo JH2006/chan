@@ -114,7 +114,7 @@ def test_month_10(market, year, month, count=0, skips=0):
 
     drawer.draw_hub(hubs.container, hubs, ax_1)
 
-    df_2 = pd.DataFrame(Component.Tran.archive(s2._trans), columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STEP_EXIT', 'STOP', 'GAIN'])
+    df_2 = pd.DataFrame(Component.Tran.archive(s2._trans), columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT',  'STOP', 'GAIN'])
 
     file = '2005_' + str(month) + '_AUD.xlsx'
 
@@ -131,7 +131,7 @@ def test_month_10(market, year, month, count=0, skips=0):
 
 def test_year(year, m1, m2):
 
-    candles = Currency.AUD_Ten_Min_Candle_Container()
+    candles = Currency.JPY_Ten_Min_Candle_Container()
 
     types = Hunter.Type_Container(candles)
 
@@ -206,24 +206,22 @@ def test_month_5(market, year, month, count=0, skips=0):
 
 if __name__ == '__main__':
 
-    ##for m in range(1, 12):
-
-    #test_month_10('', 2005, 2)
+    test_month_10('', 2005, 1)
     
-    t = []
-    for i in range(2005, 2015):
+    #t = []
+    #for i in range(2005, 2016):
     
-        t.extend(test_year(i, 1, 12))
+    #    t.extend(test_year(i, 1, 12))
 
-    df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STOP', 'GAIN'])
+    #df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STOP', 'GAIN'])
 
-    file = '2005_AUD.xlsx'
+    #file = '2005_JPY.xlsx'
 
-    writer = pd.ExcelWriter(file, engine='xlsxwriter')
+    #writer = pd.ExcelWriter(file, engine='xlsxwriter')
 
-    df_2.to_excel(writer)
+    #df_2.to_excel(writer)
 
-    writer.close()
+    #writer.close()
 
-    t = None
+    #t = None
 
