@@ -284,21 +284,22 @@ class S2:
     # 根据具体的策略要求组合不同的Entry
     def loadEntry(self):
 
-        self._entries[Component.MidEntry._name] = Component.MidEntry(0.3)
+        #self._entries[Component.MidEntry._name] = Component.MidEntry(0.3)
 
         self._entries[Component.EdgeEntry._name] = Component.EdgeEntry(0.3)
 
-        self._entries[Component.StepEntry._name] = Component.StepEntry(0.4)
+        #self._entries[Component.StepEntry._name] = Component.StepEntry(0.4)
 
     def loadExit(self):
 
-        self._exits[Component.MidExit._name] = Component.MidExit(0.5)
+        #self._exits[Component.MidExit._name] = Component.MidExit(0.5)
 
         self._exits[Component.EdgeExit._name] = Component.EdgeExit(0.5)
 
     def loadStop(self):
 
-        self._stops[Component.StopExit._name] = Component.StopExit(1)
+        #self._stops[Component.StopExit._name] = Component.StopExit(1)
+        pass
 
     # enter为事件触发响应接口
     # 对应事件：Monitor.K_GEN.
@@ -527,13 +528,18 @@ class S2:
         self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.trade_commit)
 
         # 清理待平仓队列里面已经完成平仓的交易
+        tTran = []
         for i, _ in enumerate(self._xTrans):
 
-            if len(self._xTrans[i]._exits) != 0:
+            if self._xTrans[i]._exits:
 
                 print('待平仓队列清空:', self._xTrans[i]._id)
 
-                self._xTrans.pop(i)
+            else:
+
+                tTran.append(self._xTrans[i])
+
+        self._xTrans = tTran
 
         if __debug__:
 

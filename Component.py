@@ -446,11 +446,6 @@ class EdgeExit(Exits):
 
                     trans[i]._exits[EdgeExit._name] = (point, self._position)
 
-                    # 首先触碰中枢边界，100%平仓
-                    if MidExit._name not in trans[i]._exits:
-
-                        trans[i]._exits[MidExit._name] = (point, self._position)
-
                     flag = True
 
         return flag
@@ -624,6 +619,7 @@ class Tran:
                     # 目前仅有两类平仓策略所以直接操作队列
                     buf.append(0)
                     buf.append(0)
+                    buf.append(0)
 
                     # 填充止损价位
                     buf.append(stop[name][1])
@@ -710,6 +706,14 @@ class Tran:
                 try:
 
                     buf.append(trans[i]._exits['EDGE_EXIT'][0])
+
+                except KeyError:
+
+                    buf.append(0)
+
+                try:
+
+                    buf.append(trans[i]._exits['STEP_EXIT'][0])
 
                 except KeyError:
 
