@@ -116,10 +116,6 @@ class EdgeEntry(Entries):
 
                 if low <= hub.ZG <= high:
 
-                    s = 'Entry -- Cross meet low <= ZG <= high ' + repr(low) + ', ' + repr(hub.ZG) + ', ' + repr(high)
-
-                    # print(s)
-
                     return True
 
                 else:
@@ -129,10 +125,6 @@ class EdgeEntry(Entries):
             else:
 
                 if low <= hub.ZD <= high:
-
-                    s = 'Entry -- Cross meet low <= ZD <= high ' + repr(low) + ', ' + repr(hub.ZD) + ', ' + repr(high)
-
-                    # print(s)
 
                     return True
 

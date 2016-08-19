@@ -288,7 +288,7 @@ class S2:
 
         self._entries[Component.EdgeEntry._name] = Component.EdgeEntry(0.3)
 
-        #self._entries[Component.StepEntry._name] = Component.StepEntry(0.4)
+        self._entries[Component.StepEntry._name] = Component.StepEntry(0.4)
 
     def loadExit(self):
 
@@ -563,7 +563,7 @@ class S2:
 
             # 注册平仓策略
             # 平仓操作可早于建仓启动
-            self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.exit)
+            #self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.exit)
 
         self._id += 1
 
@@ -599,6 +599,10 @@ class S2:
 
                     # 去激活中枢附件判决条件
                     self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.trade_commit)
+
+                    # 2016-08-19
+                    # 平仓也在附加条件之后
+                    self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.exit)
 
                     # 注册建仓策略处理
                     self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.enter)
