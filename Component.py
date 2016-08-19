@@ -396,7 +396,10 @@ class EdgeExit(Exits):
 
             if tran._placement == 'LONG':
 
-                if low <= hub.ZG <= high:
+                # 2016-08-19
+                # 两种情况都应该考虑平仓：1)当下K线和中枢上沿出现交集；2)当下K线最低点已经高于中枢上沿
+                # 对做空，反之亦然
+                if low <= hub.ZG <= high or low > hub.ZG:
 
                     s = 'Exit - Cross meet low <= ZG <= high ' + repr(low) + ', ' + repr(hub.ZG) + ', ' + repr(high)
 
@@ -410,7 +413,7 @@ class EdgeExit(Exits):
 
             else:
 
-                if low <= hub.ZD <= high:
+                if low <= hub.ZD <= high or high < hub.ZD:
 
                     s = 'Exit - Cross meet low <= ZD <= high ' + repr(low) + ', ' + repr(hub.ZD) + ', ' + repr(high)
 
