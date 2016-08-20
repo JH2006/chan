@@ -77,7 +77,9 @@ class MidEntry(Entries):
             if self.signaling(event):
 
                 k = event._dict['K']
-                point = k.getClose()
+                hub = event._dict['HUB']
+
+                point = (hub.ZG + hub.ZD) / 2
 
                 tran._entries[MidEntry._name] = (point, self._position)
 
@@ -139,6 +141,7 @@ class EdgeEntry(Entries):
     def order(self, event):
 
         tran = event._dict['TRAN']
+        hub = event._dict['HUB']
 
         # 通过Key确保每个策略仅执行一次
         if EdgeEntry._name not in tran._entries:
@@ -146,7 +149,15 @@ class EdgeEntry(Entries):
             if self.signaling(event):
 
                 k = event._dict['K']
-                point = k.getClose()
+
+                if tran._placement == 'SHORT':
+
+                    point = hub.ZG
+
+                else:
+
+                    point = hub.ZD
+
                 tran._entries[EdgeEntry._name] = (point, self._position)
 
                 return True
@@ -351,7 +362,9 @@ class MidExit(Exits):
                 if self.signaling(event):
 
                     k = event._dict['K']
-                    point = k.getClose()
+                    hub = event._dict['HUB']
+
+                    point = (hub.ZG + hub.ZD) / 2
 
                     trans[i]._exits[MidExit._name] = (point, self._position)
 
@@ -424,6 +437,7 @@ class EdgeExit(Exits):
     def order(self, event):
 
         trans = event._dict['TRAN']
+        hub = event._dict['HUB']
 
         flag = False
 
@@ -436,8 +450,13 @@ class EdgeExit(Exits):
 
                 if self.signaling(event):
 
-                    k = event._dict['K']
-                    point = k.getClose()
+                    if trans[i]._placement == 'LONG':
+
+                        point = hub.ZG
+
+                    else:
+                        
+                        point = hub.ZD
 
                     trans[i]._exits[EdgeExit._name] = (point, self._position)
 

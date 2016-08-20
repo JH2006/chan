@@ -284,17 +284,17 @@ class S2:
     # 根据具体的策略要求组合不同的Entry
     def loadEntry(self):
 
-        #self._entries[Component.MidEntry._name] = Component.MidEntry(0.3)
+        self._entries[Component.MidEntry._name] = Component.MidEntry(0.3)
 
-        self._entries[Component.EdgeEntry._name] = Component.EdgeEntry(0.3)
+        #self._entries[Component.EdgeEntry._name] = Component.EdgeEntry(0.3)
 
-        self._entries[Component.StepEntry._name] = Component.StepEntry(0.4)
+        #self._entries[Component.StepEntry._name] = Component.StepEntry(0.4)
 
     def loadExit(self):
 
-        #self._exits[Component.MidExit._name] = Component.MidExit(0.5)
+        self._exits[Component.MidExit._name] = Component.MidExit(0.5)
 
-        self._exits[Component.EdgeExit._name] = Component.EdgeExit(0.5)
+        #self._exits[Component.EdgeExit._name] = Component.EdgeExit(0.5)
 
     def loadStop(self):
 
@@ -516,7 +516,7 @@ class S2:
         # 当下K线位置
         last_k_post = event._dict['LENOFK']
 
-        print('新中枢ID:', event._dict['hub_id'], ' 中枢确认K线:', hub_k_pos, ' 当下K线:', last_k_post, ' 方向:', curHub.pos)
+        print('新中枢ID:', event._dict['hub_id'], ' 中枢确认K线:', hub_k_pos, ' 当下K线:', last_k_post, ' 方向:', curHub.pos, ' ZG:', curHub.ZG, ' ZD:', curHub.ZD)
 
         # 关闭建仓处理
         self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)
@@ -563,7 +563,7 @@ class S2:
 
             # 注册平仓策略
             # 平仓操作可早于建仓启动
-            #self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.exit)
+            self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.exit)
 
         self._id += 1
 
@@ -602,7 +602,7 @@ class S2:
 
                     # 2016-08-19
                     # 平仓也在附加条件之后
-                    self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.exit)
+                    #self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.exit)
 
                     # 注册建仓策略处理
                     self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.enter)

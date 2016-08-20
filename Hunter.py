@@ -475,7 +475,7 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             # 2016-07-20
             # 修正中枢边界
-            hubs.modHub()
+            #hubs.modHub()
 
             ## 中枢生成事件注入
             if single == 1:
