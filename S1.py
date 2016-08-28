@@ -516,7 +516,7 @@ class S2:
         # 当下K线位置
         last_k_post = event._dict['LENOFK']
 
-        print('新中枢ID:', event._dict['hub_id'], ' 中枢确认K线:', hub_k_pos, ' 当下K线:', last_k_post, ' 方向:', curHub.pos, ' ZG:', curHub.ZG, ' ZD:', curHub.ZD)
+        print('新中枢ID:', event._dict['HUB_ID'], ' 中枢确认K线:', hub_k_pos, ' 当下K线:', last_k_post, ' 方向:', curHub.pos, ' ZG:', curHub.ZG, ' ZD:', curHub.ZD)
 
         # 关闭建仓处理
         self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)
@@ -528,7 +528,9 @@ class S2:
         self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.trade_commit)
 
         # 清理待平仓队列里面已经完成平仓的交易
-        tTran = []
+        # 注意生成tTran的目的是避免在遍历list的同时修改list,coding之大忌!!!
+        t_tran = []
+
         for i, _ in enumerate(self._xTrans):
 
             if self._xTrans[i]._exits:
@@ -537,9 +539,9 @@ class S2:
 
             else:
 
-                tTran.append(self._xTrans[i])
+                t_tran.append(self._xTrans[i])
 
-        self._xTrans = tTran
+        self._xTrans = t_tran
 
         if __debug__:
 
@@ -564,6 +566,37 @@ class S2:
             # 注册平仓策略
             # 平仓操作可早于建仓启动
             self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.exit)
+
+        # 前一中枢没有能形成建仓交易,不过一并统计
+        else:
+
+            if self._id != -1:
+
+                try:
+
+                    hubs = event._dict['HUBS']
+                    # 当下的中枢ID,要识别前一个中枢需要-1
+                    id = event._dict['HUB_ID'] - 1
+
+                    hub = hubs[id]
+
+                    if hub.pos == 'Up':
+
+                        p = 'SHORT'
+
+                    else:
+
+                        p = 'LONG'
+
+                    self._eTran = Component.Tran(self._id, p, hub.ZG, hub.ZD)
+    
+                    self._trans[self._id] = self._eTran
+
+                    self._eTran = None
+
+                except KeyError:
+
+                    pass
 
         self._id += 1
 

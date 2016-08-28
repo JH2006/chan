@@ -475,7 +475,7 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             # 2016-07-20
             # 修正中枢边界
-            #hubs.modHub()
+            # hubs.modHub()
 
             ## 中枢生成事件注入
             if single == 1:
@@ -485,7 +485,7 @@ class Ten_Min_Candle_Container(Candle_Container):
                 try:
 
                     # 当下中枢ID
-                    born._dict['hub_id'] = len(hubs.container) - 1
+                    born._dict['HUB_ID'] = len(hubs.container) - 1
 
                     # 当下K线
                     born._dict['K'] = self.container[len(self.container) - 1]
@@ -496,6 +496,9 @@ class Ten_Min_Candle_Container(Candle_Container):
                     # 用于交易信息的传递
                     # 当下中枢
                     born._dict['HUB'] = hubs.container[len(hubs.container) - 1]
+
+                    # 中枢容器索引
+                    born._dict['HUBS'] = hubs.container
 
                 except KeyError:
 
@@ -1449,7 +1452,7 @@ class Hub_Container:
         self.container = []
 
         # 常量确定中枢的宽度
-        self.hub_width = 3
+        self.hub_width = 5
 
         self.last_hub_end_pen_index = 0
 

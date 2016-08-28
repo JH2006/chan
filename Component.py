@@ -76,7 +76,6 @@ class MidEntry(Entries):
 
             if self.signaling(event):
 
-                k = event._dict['K']
                 hub = event._dict['HUB']
 
                 point = (hub.ZG + hub.ZD) / 2
@@ -361,7 +360,6 @@ class MidExit(Exits):
 
                 if self.signaling(event):
 
-                    k = event._dict['K']
                     hub = event._dict['HUB']
 
                     point = (hub.ZG + hub.ZD) / 2
@@ -789,6 +787,34 @@ class Tran:
 
                 tran.append(copy.deepcopy(buf))
 
+                buf.clear()
+
+            # 无交易记录的空中枢
+            else:
+
+                # 基础信息填充
+                buf.append(trans[i]._id)
+                buf.append(trans[i]._hub_ZG)
+                buf.append(trans[i]._hub_ZD)
+                buf.append(trans[i]._placement)
+
+                # 建仓信息填充
+                buf.append(0)
+                buf.append(0)
+                buf.append(0)
+
+                # 平仓信息填充
+                buf.append(0)
+                buf.append(0)
+                buf.append(0)
+
+                # 止损信息填充
+                buf.append(0)
+
+                # 获利信息填充
+                buf.append(0)
+
+                tran.append(copy.deepcopy(buf))
                 buf.clear()
 
         return tran
