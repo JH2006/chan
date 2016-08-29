@@ -525,7 +525,10 @@ class S2:
         self._monitor._e.unregister(Event.Monitor.STOP, self._monitor.stop)
 
         # 注册中枢确认附件条件处理
-        self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.trade_commit)
+
+        # 2016-08-28
+        # 采用5笔中枢情况下,不再附加交易延迟条件
+        # self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.trade_commit)
 
         # 清理待平仓队列里面已经完成平仓的交易
         # 注意生成tTran的目的是避免在遍历list的同时修改list,coding之大忌!!!
@@ -597,6 +600,10 @@ class S2:
                 except KeyError:
 
                     pass
+
+        # 2016-08-28
+        # 重新启动建仓事件监控
+        self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.enter)
 
         self._id += 1
 
