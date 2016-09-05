@@ -52,7 +52,7 @@ class S1:
 
             if __debug__:
 
-                print('Strategy--exit() over')
+                #print('Strategy--exit() over')
 
                 return
 
@@ -61,8 +61,8 @@ class S1:
 
             return
 
-        print('###########################')
-        print('Trade id', self._i)
+        #print('###########################')
+        #print('Trade id', self._i)
 
         # 中枢生成具有延迟性,最后的买卖点需要以最后一根K线收盘价为参考,而不能直接以中枢的高点为做空价格
         # TODO:当前实现比较粗糙,没有做任何关于当下K线和中枢关系的判断过滤,直接做Enter操作
@@ -72,8 +72,8 @@ class S1:
         self._entryPrice = lastCandle.getClose()
 
         self._curTran.append(self._curHub.pos)
-        print('Hub pos:', self._curHub.pos)
-        print('begin K of Hub:', self._curHub.s_pen.beginType.candle_index)
+        #print('Hub pos:', self._curHub.pos)
+        #print('begin K of Hub:', self._curHub.s_pen.beginType.candle_index)
 
         self._curSize = self.position(event)
 
@@ -88,7 +88,7 @@ class S1:
 
             return
 
-        print('pos size', self._curSize)
+        #print('pos size', self._curSize)
 
         self._curTran.append(self._curSize)
 
@@ -286,6 +286,8 @@ class S2:
 
         self._entries[Component.MidEntry._name] = Component.MidEntry(0.3)
 
+        self._entries[Component.ReverseEntry._name] = Component.ReverseEntry(0.5)
+
         #self._entries[Component.EdgeEntry._name] = Component.EdgeEntry(0.3)
 
         #self._entries[Component.StepEntry._name] = Component.StepEntry(0.4)
@@ -408,6 +410,8 @@ class S2:
 
                             print('***********************')
 
+                pass
+
     # stop为事件触发响应接口
     # 对应事件：Hunter_Container.isGrow
     # 事件注册时机：S2.enter新建仓交易形成
@@ -516,7 +520,7 @@ class S2:
         # 当下K线位置
         last_k_post = event._dict['LENOFK']
 
-        print('新中枢ID:', event._dict['HUB_ID'], ' 中枢确认K线:', hub_k_pos, ' 当下K线:', last_k_post, ' 方向:', curHub.pos, ' ZG:', curHub.ZG, ' ZD:', curHub.ZD)
+        print('新中枢ID:', event._dict['HUB_ID'], ' 中枢确认K线:', hub_k_pos, ' 当下K线:', last_k_post, ' K线Close:', curHub.e_pen.endType.candle.getClose(), ' 方向:', curHub.pos, ' ZG:', curHub.ZG, ' ZD:', curHub.ZD)
 
         # 关闭建仓处理
         self._monitor._e.unregister(Event.Monitor.K_GEN, self._monitor.enter)
@@ -525,7 +529,7 @@ class S2:
         self._monitor._e.unregister(Event.Monitor.STOP, self._monitor.stop)
 
         # 注册中枢确认附件条件处理
-        self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.trade_commit)
+        #self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.trade_commit)
 
         # 清理待平仓队列里面已经完成平仓的交易
         # 注意生成tTran的目的是避免在遍历list的同时修改list,coding之大忌!!!
@@ -536,6 +540,8 @@ class S2:
             if self._xTrans[i]._exits:
 
                 print('待平仓队列清空:', self._xTrans[i]._id)
+
+                pass
 
             else:
 
@@ -548,6 +554,7 @@ class S2:
             for i, _ in enumerate(self._xTrans):
 
                 print('待平仓交易:', self._xTrans[i]._id)
+                pass
         
         # _eTran不为空说明前一中枢已经生成交易,或者已经被止损,或者等待平仓
         if self._eTran is not None:
@@ -559,6 +566,7 @@ class S2:
 
                 self._xTrans.append(self._trans[self._id])
                 print('进入待平仓队列:', self._eTran._id)
+                pass
 
             # 重新赋值eTran，准备开始新的建仓记录
             self._eTran = None
@@ -598,6 +606,7 @@ class S2:
 
                     pass
 
+        self._monitor._e.register(Event.Monitor.K_GEN, self._monitor.enter)
         self._id += 1
 
 

@@ -20,6 +20,103 @@ class Entries:
 
         pass
 
+# 2016-09-05
+# 第三类买卖点
+class ReverseEntry(Entries):
+
+    _name = 'REVERSE_ENTRY'
+
+    def __init__(self, position):
+
+        Entries.__init__(self, position)
+
+        self._name = ReverseEntry._name
+
+    def signaling(self, event):
+
+        try:
+
+            hub = event._dict['HUB']
+            hubs = event._dict['HUBS']
+            pens = event._dict['PENS']
+
+        except KeyError:
+
+            return False
+
+        hub_zg = hub.ZG
+        hub_zd = hub.ZD
+
+        i = hubs.last_hub_end_pen_index + 1
+
+        if i < pens.pens_index:
+
+            pen_high = pens.container[i].high
+            pen_low = pens.container[i].low
+
+            min_high = min(hub_zg,pen_high)
+            max_low = max(hub_zd, pen_low)
+
+            # 中枢后一笔与中枢存在交集
+            if min_high >= max_low:
+
+                # 此笔有至少4根K线
+                # 笔的形态构成满足条件
+                if pens.container[i].legal() is True and pens.illPen(pens.container[i]) is True:
+
+                    i += 1
+
+                    # 向后取一笔
+                    # 此笔有至少4根K线
+                    # 笔的形态构成满足条件
+                    # 和上一笔的判断条件相似
+
+                    try:
+
+                        if pens.container[i].legal() is True and pens.illPen(pens.container[i]) is True:
+
+                            # 取笔高低点
+                            k_h = pens.container[i].endType.candle.getHigh()
+                            k_l = pens.container[i].endType.candle.getLow()
+
+                            # 向上中枢采用笔的低点和中枢高点比较
+                            if hub.pos == 'Up':
+
+                                if k_l >= hub_zg:
+
+                                    return True
+                            
+                            else:
+
+                                if k_h <= hub_zd:
+
+                                    return True
+
+                    except IndexError:
+
+                        return False
+
+        return False
+
+    def order(self, event):
+        
+        tran = event._dict['TRAN']
+
+        # 通过Key确保每个策略仅执行一次
+        if ReverseEntry._name not in tran._entries and MidEntry._name not in tran._entries:
+
+            if self.signaling(event):
+
+                k = event._dict['K']
+
+                point = k.getClose()
+
+                tran._entries[ReverseEntry._name] = (point, self._position)
+
+                return True
+
+        return False
+
 class MidEntry(Entries):
 
     _name = 'MID_ENTRY'
@@ -72,7 +169,7 @@ class MidEntry(Entries):
         tran = event._dict['TRAN']
 
         # 通过Key确保每个策略仅执行一次
-        if MidEntry._name not in tran._entries:
+        if MidEntry._name not in tran._entries and ReverseEntry._name not in tran._entries:
 
             if self.signaling(event):
 
@@ -627,8 +724,16 @@ class Tran:
 
                         buf.append(0)
 
+                    try:
+
+                        buf.append(entries['REVERSE_ENTRY'][0])
+
+                    except KeyError:
+
+                        buf.append(0)
+
                     # 填充平仓交易信息
-                    # 目前仅有两类平仓策略所以直接操作队列
+                    buf.append(0)
                     buf.append(0)
                     buf.append(0)
                     buf.append(0)
@@ -700,6 +805,14 @@ class Tran:
                 try:
 
                     buf.append(trans[i]._entries['STEP_ENTRY'][0])
+
+                except KeyError:
+
+                    buf.append(0)
+
+                try:
+
+                    buf.append(trans[i]._entries['REVERSE_ENTRY'][0])
 
                 except KeyError:
 
@@ -799,6 +912,7 @@ class Tran:
                 buf.append(trans[i]._placement)
 
                 # 建仓信息填充
+                buf.append(0)
                 buf.append(0)
                 buf.append(0)
                 buf.append(0)

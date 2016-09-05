@@ -462,6 +462,8 @@ class Ten_Min_Candle_Container(Candle_Container):
                 can._dict['TYPES'] = types
                 # K线容器对象
                 can._dict['CANDLES'] = self
+                # 中枢容器
+                can._dict['HUBS'] = hubs
 
             except IndexError:
 
@@ -475,7 +477,7 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             # 2016-07-20
             # 修正中枢边界
-            # hubs.modHub()
+            #hubs.modHub()
 
             ## 中枢生成事件注入
             if single == 1:
@@ -509,6 +511,9 @@ class Ten_Min_Candle_Container(Candle_Container):
                 sleep(0.002)
 
             # 无中枢更新
+            # 2016-09-05
+            # 第三类买卖点条件的判断不应该由中枢对象管理
+            # 重构入Component.ReverseEntry类
             elif single == -1:
 
                 # 判断是否出现第三类买卖点
@@ -1838,7 +1843,7 @@ class Hub_Container:
 
         try: 
 
-            for i in range(pen_index, self.hub_width + pen_index):
+            for i in range(pen_index, 5 + pen_index):
 
                 h.append(self.pens.container[i].high)
                 l.append(self.pens.container[i].low)
@@ -1847,8 +1852,14 @@ class Hub_Container:
 
             return False
 
-        ZG = min(h)
-        ZD = max(l)
+        try:
+
+            ZG = min(h)
+            ZD = max(l)
+
+        except ValueError:
+
+            return False
 
         if ZG != hub.ZG or ZD != hub.ZD:
 
