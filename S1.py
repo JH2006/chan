@@ -266,6 +266,7 @@ class S2:
         # 待平仓交易队列
         self._xTrans = []
 
+
         # Entries实体队列
         self._entries = {}
 
