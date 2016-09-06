@@ -514,28 +514,28 @@ class Ten_Min_Candle_Container(Candle_Container):
             # 2016-09-05
             # 第三类买卖点条件的判断不应该由中枢对象管理
             # 重构入Component.ReverseEntry类
-            elif single == -1:
-
-                # 判断是否出现第三类买卖点
-                if hubs.isGrow():
-
-                    stop = monitor.genEvent(Event.Monitor.STOP)
-
-                    try:
-
-                        # 当下K线
-                        stop._dict['K'] = self.container[len(self.container) - 1]
-
-                        # 当下K线队列长度
-                        stop._dict['LENOFK'] = len(self.container) - 1
-
-                    except KeyError:
-
-                        pass
-
-                    monitor._e.put(stop)
-
-                    sleep(0.002)
+            # elif single == -1:
+            #
+            #     # 判断是否出现第三类买卖点
+            #     if hubs.isGrow():
+            #
+            #         stop = monitor.genEvent(Event.Monitor.STOP)
+            #
+            #         try:
+            #
+            #             # 当下K线
+            #             stop._dict['K'] = self.container[len(self.container) - 1]
+            #
+            #             # 当下K线队列长度
+            #             stop._dict['LENOFK'] = len(self.container) - 1
+            #
+            #         except KeyError:
+            #
+            #             pass
+            #
+            #         monitor._e.put(stop)
+            #
+            #         sleep(0.002)
 
 
 # 抽象类,用于给不同的具体产品实现

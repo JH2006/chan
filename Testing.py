@@ -205,22 +205,22 @@ def test_month_5(market, year, month, count=0, skips=0):
 
 if __name__ == '__main__':
 
-    test_month_10('', 2005, 5)
+    # test_month_10('', 2005, 1)
     
-    #t = []
-    #for i in range(2005, 2016):
-    
-    #    t.extend(test_year(i, 1, 12))
+    t = []
+    for i in range(2005, 2016):
 
-    #df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY','REVERSE_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STEP_EXIT', 'STOP', 'GAIN'])
+       t.extend(test_year(i, 1, 12))
 
-    #file = '5笔中枢无修改+三类买卖点.xlsx'
+    df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD', 'POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY','REVERSE_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STEP_EXIT', 'STOP', 'GAIN'])
 
-    #writer = pd.ExcelWriter(file, engine='xlsxwriter')
+    file = '5笔中枢无修改+反向三类买卖点_test.xlsx'
 
-    #df_2.to_excel(writer)
+    writer = pd.ExcelWriter(file, engine='xlsxwriter')
 
-    #writer.close()
+    df_2.to_excel(writer)
 
-    #t = None
+    writer.close()
+
+    t = None
 

@@ -20,11 +20,102 @@ class Entries:
 
         pass
 
-# 2016-09-05
-# 第三类买卖点
+
+# 趋势反转中的第三类买卖点
+# 这类买卖点低于向上中枢低点,高于向下中枢高点,所以称之为趋势反转三买卖
 class ReverseEntry(Entries):
 
     _name = 'REVERSE_ENTRY'
+
+    def __init__(self, position):
+
+        Entries.__init__(self, position)
+
+        self._name = ReverseEntry._name
+
+    def signaling(self, event):
+
+        try:
+
+            hub = event._dict['HUB']
+            hubs = event._dict['HUBS']
+            pens = event._dict['PENS']
+
+        except KeyError:
+
+            return False
+
+        hub_zg = hub.ZG
+        hub_zd = hub.ZD
+
+        i = hubs.last_hub_end_pen_index
+
+        if i < pens.pens_index:
+
+            # 中枢最后一笔的条件要求
+            # 此笔有至少4根K线
+            # 笔的形态构成满足条件
+            if pens.container[i].legal() is True and pens.illPen(pens.container[i]) is True:
+
+                i += 1
+
+                # 向后取一笔
+                # 此笔有至少4根K线
+                # 笔的形态构成满足条件
+                # 和上一笔的判断条件相似
+
+                try:
+
+                    if pens.container[i].legal() is True and pens.illPen(pens.container[i]) is True:
+
+                        # 取笔高低点
+                        k_h = pens.container[i].endType.candle.getHigh()
+                        k_l = pens.container[i].endType.candle.getLow()
+
+                        # 向上中枢采用笔的低点和中枢高点比较
+                        if hub.pos == 'Up':
+
+                            if k_h < hub_zd:
+
+                                return True
+
+                        else:
+
+                            if k_l > hub_zg:
+
+                                return True
+
+                except IndexError:
+
+                    return False
+
+        return False
+
+    def order(self, event):
+        
+        tran = event._dict['TRAN']
+
+        # 通过Key确保每个策略仅执行一次
+        if ReverseEntry._name not in tran._entries and MidEntry._name not in tran._entries:
+
+            if self.signaling(event):
+
+                k = event._dict['K']
+
+                point = k.getClose()
+
+                tran._entries[ReverseEntry._name] = (point, self._position)
+
+                return True
+
+        return False
+
+
+# 趋势延伸中的第三类买卖点
+# 这类买卖点高于向上中枢高点,低于向下中枢低点,所以称之为趋势延伸三买卖
+class FollowEntry(Entries):
+
+    _name = 'Follow_ENTRY'
 
     def __init__(self, position):
 
@@ -85,7 +176,7 @@ class ReverseEntry(Entries):
                                 if k_l >= hub_zg:
 
                                     return True
-                            
+
                             else:
 
                                 if k_h <= hub_zd:
@@ -99,7 +190,7 @@ class ReverseEntry(Entries):
         return False
 
     def order(self, event):
-        
+
         tran = event._dict['TRAN']
 
         # 通过Key确保每个策略仅执行一次
@@ -116,6 +207,7 @@ class ReverseEntry(Entries):
                 return True
 
         return False
+
 
 class MidEntry(Entries):
 
@@ -182,7 +274,6 @@ class MidEntry(Entries):
                 return True
 
         return False
-
 
 class EdgeEntry(Entries):
 
