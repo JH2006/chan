@@ -114,7 +114,22 @@ def test_month_10(market, year, month, count=0, skips=0):
 
     drawer.draw_hub(hubs.container, hubs, ax_1)
 
-    df_2 = pd.DataFrame(Component.Tran.archive(s2._trans), columns = ['TRAN ID', 'ZG', 'ZD','POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY', 'REVERSE_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STEP_EXIT', 'STOP', 'GAIN'])
+    df_2 = pd.DataFrame(Component.Tran.archive(s2._trans), columns = ['TRAN ID',
+                                                                      'ZG',
+                                                                      'ZD',
+                                                                      'POS',
+                                                                      'MID_ENTRY',
+                                                                      'EDGE_ENTRY',
+                                                                      'STEP_ENTRY',
+                                                                      'FOLLOW_ENTRY',
+                                                                      'REVERSE_ENTRY',
+                                                                      'IMM_ENTRY',
+                                                                      'MID_EXIT',
+                                                                      'EDGE_EXIT',
+                                                                      'IMM_EXIT',
+                                                                      'STEP_EXIT',
+                                                                      'STOP',
+                                                                      'GAIN'])
 
     file = '2005_' + str(month) + '_AUD.xlsx'
 
@@ -212,9 +227,24 @@ if __name__ == '__main__':
 
        t.extend(test_year(i, 1, 12))
 
-    df_2 = pd.DataFrame(t, columns = ['TRAN ID', 'ZG', 'ZD', 'POS', 'MID_ENTRY', 'EDGE_ENTRY', 'STEP_ENTRY','REVERSE_ENTRY', 'MID_EXIT', 'EDGE_EXIT', 'STEP_EXIT', 'STOP', 'GAIN'])
+    df_2 = pd.DataFrame(t, columns = ['TRAN ID',
+                                      'ZG',
+                                      'ZD',
+                                      'POS',
+                                      'MID_ENTRY',
+                                      'EDGE_ENTRY',
+                                      'STEP_ENTRY',
+                                      'FOLLOW_ENTRY',
+                                      'REVERSE_ENTRY',
+                                      'IMM_ENTRY',
+                                      'MID_EXIT',
+                                      'EDGE_EXIT',
+                                      'IMM_EXIT',
+                                      'STEP_EXIT',
+                                      'STOP',
+                                      'GAIN'])
 
-    file = '5笔中枢无修改+反向三类买卖点_test.xlsx'
+    file = '5笔中枢无修改+即时交易.xlsx'
 
     writer = pd.ExcelWriter(file, engine='xlsxwriter')
 

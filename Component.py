@@ -20,6 +20,36 @@ class Entries:
 
         pass
 
+# 即时交易策略
+# 一旦中枢确认立刻启动事件响应注册
+# 中枢确认后的下一个K线完成交易
+class ImmEntry(Entries):
+
+    _name = 'IMM_ENTRY'
+
+    def signaling(self, event):
+
+        return True
+
+    def order(self, event):
+
+        tran = event._dict['TRAN']
+
+        # 通过Key确保每个策略仅执行一次
+        if ImmEntry._name not in tran._entries:
+
+            if self.signaling(event):
+
+                k = event._dict['K']
+
+                point = k.getClose()
+
+                tran._entries[ImmEntry._name] = (point, self._position)
+
+                return True
+
+        return False
+
 
 # 趋势反转中的第三类买卖点
 # 这类买卖点低于向上中枢低点,高于向下中枢高点,所以称之为趋势反转三买卖
@@ -96,7 +126,7 @@ class ReverseEntry(Entries):
         tran = event._dict['TRAN']
 
         # 通过Key确保每个策略仅执行一次
-        if ReverseEntry._name not in tran._entries and MidEntry._name not in tran._entries:
+        if ReverseEntry._name not in tran._entries and FollowEntry._name not in tran._entries:
 
             if self.signaling(event):
 
@@ -115,7 +145,7 @@ class ReverseEntry(Entries):
 # 这类买卖点高于向上中枢高点,低于向下中枢低点,所以称之为趋势延伸三买卖
 class FollowEntry(Entries):
 
-    _name = 'Follow_ENTRY'
+    _name = 'FOLLOW_ENTRY'
 
     def __init__(self, position):
 
@@ -194,7 +224,7 @@ class FollowEntry(Entries):
         tran = event._dict['TRAN']
 
         # 通过Key确保每个策略仅执行一次
-        if ReverseEntry._name not in tran._entries and MidEntry._name not in tran._entries:
+        if FollowEntry._name not in tran._entries and ReverseEntry._name not in tran._entries:
 
             if self.signaling(event):
 
@@ -202,7 +232,7 @@ class FollowEntry(Entries):
 
                 point = k.getClose()
 
-                tran._entries[ReverseEntry._name] = (point, self._position)
+                tran._entries[FollowEntry._name] = (point, self._position)
 
                 return True
 
@@ -274,6 +304,7 @@ class MidEntry(Entries):
                 return True
 
         return False
+
 
 class EdgeEntry(Entries):
 
@@ -350,6 +381,7 @@ class EdgeEntry(Entries):
                 return True
 
         return False
+
 
 class StepEntry(Entries):
     
@@ -452,6 +484,41 @@ class Exits:
     def order(self, event):
 
         pass
+
+# 即时交易策略
+# 一旦中枢确认立刻启动事件响应注册
+# 中枢确认后的下一个K线完成交易
+class ImmExit(Exits):
+
+    _name = 'IMM_EXIT'
+
+    def signaling(self, event):
+
+        return True
+
+    def order(self, event):
+
+        trans = event._dict['TRAN']
+
+        flag = False
+
+        for i, _ in enumerate(trans):
+
+            # 通过Key确保每个策略仅执行一次
+            if MidExit._name not in trans[i]._exits:
+
+                if self.signaling(event):
+
+                    k = event._dict['K']
+
+                    point = k.getClose()
+
+                    trans[i]._exits[ImmExit._name] = (point, self._position)
+
+                    flag = True
+
+        return flag
+
 
 class StopExit(Exits):
 
@@ -557,6 +624,7 @@ class MidExit(Exits):
                     flag = True
 
         return flag
+
 
 class EdgeExit(Exits):
 
@@ -793,7 +861,7 @@ class Tran:
                     # 填充建仓信息
                     try:
 
-                        buf.append(entries['MID_ENTRY'][0])
+                        buf.append(entries[MidEntry._name][0])
 
                     except KeyError:
 
@@ -801,7 +869,7 @@ class Tran:
 
                     try:
 
-                        buf.append(entries['EDGE_ENTRY'][0])
+                        buf.append(entries[EdgeEntry._name][0])
 
                     except KeyError:
 
@@ -809,7 +877,7 @@ class Tran:
 
                     try:
 
-                        buf.append(entries['STEP_ENTRY'][0])
+                        buf.append(entries[StepEntry._name][0])
 
                     except KeyError:
 
@@ -817,7 +885,23 @@ class Tran:
 
                     try:
 
-                        buf.append(entries['REVERSE_ENTRY'][0])
+                        buf.append(entries[FollowEntry._name][0])
+
+                    except KeyError:
+
+                        buf.append(0)
+
+                    try:
+
+                        buf.append(entries[ReverseEntry._name][0])
+
+                    except KeyError:
+
+                        buf.append(0)
+
+                    try:
+
+                        buf.append(entries[ImmEntry._name][0])
 
                     except KeyError:
 
@@ -879,7 +963,7 @@ class Tran:
                 # 填充建仓信息
                 try:
 
-                    buf.append(trans[i]._entries['MID_ENTRY'][0])
+                    buf.append(trans[i]._entries[MidEntry._name][0])
 
                 except KeyError:
 
@@ -887,7 +971,7 @@ class Tran:
 
                 try:
 
-                    buf.append(trans[i]._entries['EDGE_ENTRY'][0])
+                    buf.append(trans[i]._entries[EdgeEntry._name][0])
 
                 except KeyError:
 
@@ -895,7 +979,7 @@ class Tran:
 
                 try:
 
-                    buf.append(trans[i]._entries['STEP_ENTRY'][0])
+                    buf.append(trans[i]._entries[StepEntry._name][0])
 
                 except KeyError:
 
@@ -903,7 +987,23 @@ class Tran:
 
                 try:
 
-                    buf.append(trans[i]._entries['REVERSE_ENTRY'][0])
+                    buf.append(trans[i]._entries[FollowEntry._name][0])
+
+                except KeyError:
+
+                    buf.append(0)
+
+                try:
+
+                    buf.append(trans[i]._entries[ReverseEntry._name][0])
+
+                except KeyError:
+
+                    buf.append(0)
+
+                try:
+
+                    buf.append(trans[i]._entries[ImmEntry._name][0])
 
                 except KeyError:
 
@@ -913,7 +1013,7 @@ class Tran:
                 # 填充平仓信息
                 try:
 
-                    buf.append(trans[i]._exits['MID_EXIT'][0])
+                    buf.append(trans[i]._exits[MidExit._name][0])
 
                 except KeyError:
 
@@ -921,7 +1021,15 @@ class Tran:
 
                 try:
 
-                    buf.append(trans[i]._exits['EDGE_EXIT'][0])
+                    buf.append(trans[i]._exits[EdgeExit._name][0])
+
+                except KeyError:
+
+                    buf.append(0)
+
+                try:
+
+                    buf.append(trans[i]._exits[ImmExit._name][0])
 
                 except KeyError:
 
@@ -1007,8 +1115,11 @@ class Tran:
                 buf.append(0)
                 buf.append(0)
                 buf.append(0)
+                buf.append(0)
+                buf.append(0)
 
                 # 平仓信息填充
+                buf.append(0)
                 buf.append(0)
                 buf.append(0)
                 buf.append(0)
@@ -1026,5 +1137,7 @@ class Tran:
 
     def __del__(self):
         self._entries.clear()
+
         self._exits.clear()
+
         self._stops.clear()

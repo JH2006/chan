@@ -285,19 +285,25 @@ class S2:
     # 根据具体的策略要求组合不同的Entry
     def loadEntry(self):
 
-        self._entries[Component.MidEntry._name] = Component.MidEntry(0.3)
+        # self._entries[Component.MidEntry._name] = Component.MidEntry(0.3)
 
-        self._entries[Component.ReverseEntry._name] = Component.ReverseEntry(0.5)
+        # self._entries[Component.ReverseEntry._name] = Component.ReverseEntry(0.5)
+
+        # self._entries[Component.FollowEntry._name] = Component.FollowEntry(0.5)
 
         #self._entries[Component.EdgeEntry._name] = Component.EdgeEntry(0.3)
 
         #self._entries[Component.StepEntry._name] = Component.StepEntry(0.4)
 
+        self._entries[Component.ImmEntry._name] = Component.ImmEntry(1)
+
     def loadExit(self):
 
-        self._exits[Component.MidExit._name] = Component.MidExit(0.5)
+        # self._exits[Component.MidExit._name] = Component.MidExit(0.5)
 
         #self._exits[Component.EdgeExit._name] = Component.EdgeExit(0.5)
+
+        self._exits[Component.ImmExit._name] = Component.ImmExit(1)
 
     def loadStop(self):
 
@@ -382,7 +388,7 @@ class S2:
         # 平仓队列输入进event进行参数传递
         event._dict['TRAN'] = self._xTrans
 
-        # 遍历待平仓队列
+        # 遍历平仓策略字典
         for name in self._exits:
 
             # 有平仓操作成功执行返回True
