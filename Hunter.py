@@ -419,8 +419,15 @@ class Ten_Min_Candle_Container(Candle_Container):
 
         for d in self.__cursor:
 
-            m = Ten_Min_Candle(d['Year'], d['Month'], d['Day'], d['Hour'], d['Min_10'], d['Open'], d['Close'],
-                               d['High'], d['Low'])
+            m = Ten_Min_Candle(d['Year'],
+                               d['Month'],
+                               d['Day'],
+                               d['Hour'],
+                               d['Min_10'],
+                               d['Open'],
+                               d['Close'],
+                               d['High'],
+                               d['Low'])
 
             self.container.append(m)
 
@@ -601,33 +608,20 @@ class One_Min_Candle_Container(Candle_Container):
         # 不同的产品会指向不同的数据库,这个属性会在具体的继承类中实现
         self._collector = ''
 
-    def loadDB(self, year, month, day, hour, min_10, min_5, types, pens, hubs, bucket):
+    def loadDB(self, year, month, count, skips, types, pens, hubs, monitor):
 
-        from Strategy import Ten_Min_Bucket
+        if count > self._collector.count():
+            print('Warm!!! Count is overside!!!')
+
+            self._c.closeDB()
 
         try:
 
-            # 10min为高级别查询
-            if isinstance(bucket, Ten_Min_Bucket):
-
-                self.cursor = self._collector.find({'Year': year,
-                                                    'Month': month,
-                                                    'Day': day,
-                                                    'Hour': hour,
-                                                    'Min_10': min_10}, limit=10)
-            # 5min为高级别查询
-            else:
-
-                self.cursor = self._collector.find({'Year': year,
-                                                    'Month': month,
-                                                    'Day': day,
-                                                    'Hour': hour,
-                                                    'Min_10': min_10,
-                                                    'Min_5': min_5}, limit=5)
+            self.__cursor = self._collector.find({'Year': year, 'Month': month}, limit=count, skip=skips)
 
         except BaseException:
 
-            print('mongoDB goes wrong in Ten_Min_Condle_Container')
+            print('mongoDB goes wrong in One_Min_Candle_Container')
 
         for d in self.cursor:
             m = One_Min_Candle(d['Year'],
