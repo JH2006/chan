@@ -244,7 +244,7 @@ if __name__ == '__main__':
                                       'STOP',
                                       'GAIN'])
 
-    file = '5笔中枢无修改+即时交易.xlsx'
+    file = '5笔中枢无修改+反向第三类买卖点建仓+中点平仓+中点止损.xlsx'
 
     writer = pd.ExcelWriter(file, engine='xlsxwriter')
 

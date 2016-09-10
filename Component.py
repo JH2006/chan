@@ -70,6 +70,7 @@ class ReverseEntry(Entries):
             hub = event._dict['HUB']
             hubs = event._dict['HUBS']
             pens = event._dict['PENS']
+            k_id = event._dict['LENOFK']
 
         except KeyError:
 
@@ -97,6 +98,15 @@ class ReverseEntry(Entries):
                 try:
 
                     if pens.container[i].legal() is True and pens.illPen(pens.container[i]) is True:
+
+                        # 取笔终结K线ID和当下K线ID做对比
+                        # 如果不一致说明,K线出现在中枢形态终结之后,不能用于操作,直接退出
+                        pen_k_id = pens.container[i].endType.candle_index
+
+                        # 笔的确认需要向前一根K线,所以笔的末尾K线和形成笔确认的当下K线有一个偏置
+                        if pen_k_id != k_id - 1:
+
+                            return False
 
                         # 取笔高低点
                         k_h = pens.container[i].endType.candle.getHigh()
@@ -248,7 +258,6 @@ class MidEntry(Entries):
         Entries.__init__(self, position)
 
         self._name = MidEntry._name
-
 
     def signaling(self, event):
 
@@ -458,13 +467,13 @@ class StepEntry(Entries):
 
         if StepEntry._name not in tran._entries:
 
-           if self.signaling(event):
+            if self.signaling(event):
 
-               k = event._dict['K']
-               point = k.getClose()
-               tran._entries[StepEntry._name] = (point, self._position)
+                k = event._dict['K']
+                point = k.getClose()
+                tran._entries[StepEntry._name] = (point, self._position)
 
-               return True
+                return True
 
         return False
 
@@ -520,33 +529,64 @@ class ImmExit(Exits):
         return flag
 
 
-class StopExit(Exits):
+# 2016-09-09
+# 止损在反向第三类买卖点成交后又重新回到中枢并穿越中点的情况
+class StopReverseExit(Exits):
 
-    _name = 'STOP_EXIT'
+    _name = 'STOP_REVERSE_EXIT'
 
     def __init__(self, position):
 
         Exits.__init__(self, position)
 
-        self._name = StopExit._name
+        self._name = StopReverseExit._name
 
     def signaling(self, event):
 
-        return True
+        try:
+
+            hub = event._dict['HUB']
+            k = event._dict['K']
+
+        except KeyError:
+
+            return False
+
+        k_h = k.getHigh()
+        k_l = k.getClose()
+
+        try:
+
+            mid = (hub.ZD + hub.ZG) / 2
+
+        except KeyError:
+
+            return False
+
+        if k_l <= mid <= k_h:
+
+            cross = True
+
+        else:
+
+            cross = False
+
+        return cross
 
     def order(self, event):
 
-        if self.signaling(event):
+        tran = event._dict['TRAN']
 
-            tran = event._dict['TRAN']
+        # 是否已经执行过反向第三类买卖点操作
+        if ReverseEntry._name in tran._entries:
 
-            if len(tran._entries) != 0:
+            if self.signaling(event):
 
                 k = event._dict['K']
                 point = k.getClose()
 
                 s = {}
-                s[StopExit._name] = (copy.deepcopy(tran._entries), point)
+                s[StopReverseExit._name] = (copy.deepcopy(tran._entries), point)
 
                 tran._stops.append(s)
                 tran._entries.clear()

@@ -471,6 +471,8 @@ class Ten_Min_Candle_Container(Candle_Container):
                 can._dict['CANDLES'] = self
                 # 中枢容器
                 can._dict['HUBS'] = hubs
+                # 当下中枢ID
+                can._dict['HUB_ID'] = len(hubs.container) - 1
 
             except IndexError:
 
@@ -484,7 +486,7 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             # 2016-07-20
             # 修正中枢边界
-            #hubs.modHub()
+            # hubs.mod_hub()
 
             ## 中枢生成事件注入
             if single == 1:
@@ -1821,7 +1823,7 @@ class Hub_Container:
     # 修正中枢边界
     # 随着分型结构出现以及中枢前三笔的不断修正，中枢的ZG/ZD区间会有所变化
     # 当前实现是在新中枢出现前会不断追踪变化，理论上前三笔变化不会持续如此长时间，在不影响性能的情况下可以接受
-    def modHub(self):
+    def mod_hub(self):
 
         try:
 
@@ -1837,7 +1839,7 @@ class Hub_Container:
 
         try: 
 
-            for i in range(pen_index, 5 + pen_index):
+            for i in range(pen_index, self.hub_width + pen_index):
 
                 h.append(self.pens.container[i].high)
                 l.append(self.pens.container[i].low)

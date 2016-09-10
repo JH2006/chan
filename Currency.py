@@ -148,7 +148,10 @@ class AUD_Ten_Min_Candle_Container(Hunter.Ten_Min_Candle_Container):
 
         Hunter.Ten_Min_Candle_Container.__init__(self)
 
+        # 2016-09-07
+        # 临时性使用AUD1m替换10m进行测试,简化多样性One_Min_Candle_Container.loadDB带来的复杂性
         self._collector = self._c.mongodb.AUD10m
+        # self._collector = self._c.mongodb.AUD1m
 
 class CAD_Ten_Min_Candle_Container(Hunter.Ten_Min_Candle_Container):
 
