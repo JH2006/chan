@@ -131,22 +131,91 @@ class ReverseEntry(Entries):
 
         return False
 
+
+    def over(self, event):
+
+        try:
+
+            tran = event._dict['TRAN']
+            hub = event._dict['HUB']
+            k = event._dict['K']
+            tPoint = (hub.ZG+hub.ZD)/2
+
+        except KeyError:
+
+            return 0
+
+        # 寻找已知的阻力点位置
+        for i, _ in enumerate(tran._stops):
+
+            rEntry = tran._stops[i][StopReverseExit._name][0]
+
+            point = rEntry[ReverseEntry._name][0]
+
+            # 如果是向上中枢
+            # 寻找已知交易的最低点（向下阻力点）
+            if hub.pos == 'Up':
+
+                if point < tPoint:
+
+                    tPoint = point
+
+            # 如果是向下中枢
+            # 寻找已知交易的最高点（向上阻力点）
+            else:
+
+                if point > tPoint:
+
+                    tPoint = point 
+
+        # 判断当下K线位置与阻力点的关系
+        if hub.pos == 'Up':
+
+            # 突破向下阻力点
+            if k.getClose() <= tPoint:
+
+                return True
+
+        else:
+
+            # 突破向上阻力点
+            if k.getClose() >= tPoint:
+
+                return True
+
+        return False
+
+
     def order(self, event):
         
         tran = event._dict['TRAN']
 
         # 通过Key确保每个策略仅执行一次
-        if ReverseEntry._name not in tran._entries and FollowEntry._name not in tran._entries:
+        if ReverseEntry._name not in tran._entries:
 
-            if self.signaling(event):
+            if tran._stops:
 
-                k = event._dict['K']
+                if self.over(event):
 
-                point = k.getClose()
+                    k = event._dict['K']
 
-                tran._entries[ReverseEntry._name] = (point, self._position)
+                    point = k.getClose()
 
-                return True
+                    tran._entries[ReverseEntry._name] = (point, self._position)
+
+                    return True
+
+            else: 
+            
+                if self.signaling(event):
+
+                    k = event._dict['K']
+
+                    point = k.getClose()
+
+                    tran._entries[ReverseEntry._name] = (point, self._position)
+
+                    return True
 
         return False
 
