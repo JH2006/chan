@@ -131,15 +131,14 @@ class ReverseEntry(Entries):
 
         return False
 
-
-    def over(self, event):
+    def resist(self, event):
 
         try:
 
             tran = event._dict['TRAN']
             hub = event._dict['HUB']
             k = event._dict['K']
-            tPoint = (hub.ZG+hub.ZD)/2
+            tpoint = (hub.ZG+hub.ZD)/2
 
         except KeyError:
 
@@ -156,35 +155,34 @@ class ReverseEntry(Entries):
             # 寻找已知交易的最低点（向下阻力点）
             if hub.pos == 'Up':
 
-                if point < tPoint:
+                if point < tpoint:
 
-                    tPoint = point
+                    tpoint = point
 
             # 如果是向下中枢
             # 寻找已知交易的最高点（向上阻力点）
             else:
 
-                if point > tPoint:
+                if point > tpoint:
 
-                    tPoint = point 
+                    tpoint = point
 
         # 判断当下K线位置与阻力点的关系
         if hub.pos == 'Up':
 
             # 突破向下阻力点
-            if k.getClose() <= tPoint:
+            if k.getClose() < tpoint:
 
                 return True
 
         else:
 
             # 突破向上阻力点
-            if k.getClose() >= tPoint:
+            if k.getClose() > tpoint:
 
                 return True
 
         return False
-
 
     def order(self, event):
         
@@ -195,7 +193,7 @@ class ReverseEntry(Entries):
 
             if tran._stops:
 
-                if self.over(event):
+                if self.resist(event):
 
                     k = event._dict['K']
 
@@ -621,8 +619,7 @@ class StopReverseExit(Exits):
 
             return False
 
-        k_h = k.getHigh()
-        k_l = k.getClose()
+        k_close = k.getClose()
 
         try:
 
@@ -632,15 +629,19 @@ class StopReverseExit(Exits):
 
             return False
 
-        if k_l <= mid <= k_h:
+        if hub.pos == 'Up':
 
-            cross = True
+            if k_close > mid:
+
+                return True
 
         else:
 
-            cross = False
+            if k_close < mid:
 
-        return cross
+                return True
+
+        return False
 
     def order(self, event):
 
