@@ -486,7 +486,7 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             # 2016-07-20
             # 修正中枢边界
-            # hubs.mod_hub()
+            hubs.mod_hub()
 
             ## 中枢生成事件注入
             if single == 1:
@@ -1665,6 +1665,12 @@ class Hub_Container:
                                 # 非法中枢,清空,不放入队列
                                 cur_pen_index += 1
 
+                            # 2016-09-13
+                            # 新增中枢边界包含判断
+                            elif self.overlap(hub, 'Up'):
+
+                                cur_pen_index += 1
+
                             # 新中枢具有合法的第一笔
                             # 记录新中枢相对于前一个中枢的位置属性
                             else:
@@ -1674,7 +1680,6 @@ class Hub_Container:
 
                                 # 2016-04-11
                                 # 中枢扩展的发现没有延迟的属性,每次加入的都是当前最新笔
-                                # 被断定为中枢扩展的次级别数据可以存储到本中枢中为次级别走势判断服务
                                 e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
 
                                 # 具有可扩展性
@@ -1712,6 +1717,12 @@ class Hub_Container:
 
                             # 新生成的中枢第一笔方向不合理,需要重新处理
                             if hub.s_pen.pos != 'Up':
+
+                                cur_pen_index += 1
+
+                            # 2016-09-13
+                            # 新增中枢边界包含判断
+                            elif self.overlap(hub, 'Down'):
 
                                 cur_pen_index += 1
 
@@ -1940,11 +1951,7 @@ class Hub_Container:
                 hub_ZD = hub.ZD
                 """
 
-                # 2016-04-11
-                # 取消扩张部分对中枢区间的修改
-
                 # 出现了中枢新高或新低
-
                 hub.GG = max(pen_high, hub.GG)
 
                 hub.DD = min(pen_low, hub.DD)
@@ -1958,6 +1965,55 @@ class Hub_Container:
                 break
 
         return cur_index
+
+    # 2016-09-13
+    # 获取除最后一笔以外的中枢高低点
+    def range(self):
+
+        hub = self.container[len(self.container) - 1]
+
+        end_pen = hub.e_pen_index
+
+        h = []
+        l = []
+
+        for i in range(hub.s_pen_index, hub.e_pen_index):
+            
+            h.append(self.pens.container[i].high)
+            l.append(self.pens.container[i].low)
+
+            GG = max(h)
+            DD = min(l)
+
+            r = {}
+            r['h'] = GG
+            r['l'] = DD
+
+        return r
+
+    # 2016-09-13
+    # 计算本中枢与前一中枢重叠部分
+    # 如果当下中枢区间完全被前一中枢边界至高低点包含，则不生成中枢
+    def overlap(self, hub, pos):
+
+        pre_hub = self.container[len(self.container) - 1]
+
+        r = self.range()
+
+        if pos == 'Up':
+        
+            if r['h'] > hub.ZG and pre_hub.ZG < hub.ZD:
+                
+                return True
+            
+        else:
+            
+            if r['l'] < hub.ZD and pre_hub.ZD > hub.ZG:
+                
+                return True
+            
+        return False 
+
 
     # 2016-06-28
     # 用于失败中枢是否存在延伸的可能。这里的“可能性”是指目前的笔和中枢存在交集，但数量上没能达到end_pen_index+2*t, t = 1,2,3,4,5..的要求
