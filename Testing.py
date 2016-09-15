@@ -220,37 +220,37 @@ def test_month_5(market, year, month, count=0, skips=0):
 
 if __name__ == '__main__':
 
-    test_month_10('', 2006, 5)
+    #test_month_10('', 2006, 5)
     
-    #t = []
-    #for i in range(2005, 2016):
+    t = []
+    for i in range(2005, 2016):
 
-    #   t.extend(test_year(i, 1, 12))
+       t.extend(test_year(i, 1, 12))
 
-    #df_2 = pd.DataFrame(t, columns = ['TRAN ID',
-    #                                 'ZG',
-    #                                 'ZD',
-    #                                 'POS',
-    #                                 'MID_ENTRY',
-    #                                 'EDGE_ENTRY',
-    #                                 'STEP_ENTRY',
-    #                                 'FOLLOW_ENTRY',
-    #                                 'REVERSE_ENTRY',
-    #                                 'IMM_ENTRY',
-    #                                 'MID_EXIT',
-    #                                 'EDGE_EXIT',
-    #                                 'IMM_EXIT',
-    #                                 'STEP_EXIT',
-    #                                 'STOP',
-    #                                 'GAIN'])
+    df_2 = pd.DataFrame(t, columns = ['TRAN ID',
+                                     'ZG',
+                                     'ZD',
+                                     'POS',
+                                     'MID_ENTRY',
+                                     'EDGE_ENTRY',
+                                     'STEP_ENTRY',
+                                     'FOLLOW_ENTRY',
+                                     'REVERSE_ENTRY',
+                                     'IMM_ENTRY',
+                                     'MID_EXIT',
+                                     'EDGE_EXIT',
+                                     'IMM_EXIT',
+                                     'STEP_EXIT',
+                                     'STOP',
+                                     'GAIN'])
 
-    #file = '4笔中枢不带修改+中点建仓+中点平仓.xlsx'
+    file = '4笔中枢不带修改+中点建仓+中点平仓+允许中枢重叠.xlsx'
 
-    #writer = pd.ExcelWriter(file, engine='xlsxwriter')
+    writer = pd.ExcelWriter(file, engine='xlsxwriter')
 
-    #df_2.to_excel(writer)
+    df_2.to_excel(writer)
 
-    #writer.close()
+    writer.close()
 
-    #t = None
+    t = None
 

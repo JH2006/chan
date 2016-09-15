@@ -1512,8 +1512,9 @@ class Hub_Container:
 
                     # 2016-08-05
                     # 新增一个笔标示的处理,识别笔与中枢的归属关系
-                    self.pens.container[cur_pen_index + 1]._bHub = True
-                    self.pens.container[cur_pen_index + self.hub_width]._bHub = True
+                    for i in range(hub.s_pen_index, hub.e_pen_index+1):
+
+                        self.pens.container[i]._bHub = True
 
                     # 2016-04-04
                     # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
@@ -1638,21 +1639,12 @@ class Hub_Container:
                                   cur_pen_index + 1,
                                   cur_pen_index + self.hub_width)
 
-                        if cur_pen_index == 33:
-
-                            print('go')
-
                         # 2016-04-04
                         # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
                         hub.x_pen = copy.deepcopy(hub.e_pen)
 
                         # 2016-08-04
                         hub._grow = True
-
-                        # 2016-08-05
-                        # 新增一个笔标示的处理,识别笔与中枢的归属关系
-                        self.pens.container[cur_pen_index + 1]._bHub = True
-                        self.pens.container[cur_pen_index + self.hub_width]._bHub = True
 
                         # 2016-04-17
                         # 新临时变量临时保存cur_pen_index,用于加载Bucket的时候使用
@@ -1679,6 +1671,12 @@ class Hub_Container:
                             # 新中枢具有合法的第一笔
                             # 记录新中枢相对于前一个中枢的位置属性
                             else:
+
+                                # 2016-08-05
+                                # 新增一个笔标示的处理,识别笔与中枢的归属关系
+                                for i in range(hub.s_pen_index, hub.e_pen_index+1):
+
+                                    self.pens.container[i]._bHub = True
 
                                 # 新中枢新的位置属性
                                 hub.pos = 'Up'
@@ -1733,6 +1731,12 @@ class Hub_Container:
 
                             else:
 
+                                # 2016-08-05
+                                # 新增一个笔标示的处理,识别笔与中枢的归属关系
+                                for i in range(hub.s_pen_index, hub.e_pen_index+1):
+
+                                    self.pens.container[i]._bHub = True
+
                                 # 新中枢新的位置属性
                                 hub.pos = 'Down'
 
@@ -1768,12 +1772,69 @@ class Hub_Container:
 
                                 return 1
 
-                        # TODO: 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
-                        # 前后两个中枢存在重叠区域,这种情况对中枢做合并
+                        # 目前对于有重叠区间的中枢按照正常中枢留着,不做额外处理
                         # 暂时没有实现,仅仅忽略中枢添加入队列,并且挪到笔
                         else:
 
-                            cur_pen_index += 1
+                            #cur_pen_index += 1
+
+                            # 2016-09-14
+                            # 新中枢新的位置属性以及第一笔朝向判断
+                            if (hub.ZG + hub.ZD)/2 < (last_hub.ZG + last_hub.ZD)/2:
+    
+                                hub.pos = 'Down'
+
+                            else:
+
+                                hub.pos = 'Up'           
+
+                            if hub.pos == 'Down' and hub.s_pen.pos != 'Up':
+
+                                cur_pen_index += 1
+
+                            elif hub.pos == 'Up' and hub.s_pen.pos != 'Down':
+
+                                cur_pen_index += 1
+     
+                            else:
+
+                                # 2016-09-14
+                                # 新增一个笔标示的处理,识别笔与中枢的归属关系
+                                for i in range(hub.s_pen_index, hub.e_pen_index+1):
+
+                                    self.pens.container[i]._bHub = True
+
+                                # 调用扩张检查
+                                e_hub_pen_index = self.isExpandable(hub, cur_pen_index + self.hub_width)
+
+                                # 存在扩张
+                                if e_hub_pen_index != cur_pen_index + self.hub_width:
+
+                                    hub.e_pen = self.pens.container[e_hub_pen_index]
+
+                                    # 2016-05-16
+                                    # 中枢笔索引修改
+                                    hub.update_e_pen_index(e_hub_pen_index)
+
+                                    cur_pen_index = e_hub_pen_index + 1
+
+                                    self.last_hub_end_pen_index = e_hub_pen_index
+
+                                    # 2016-08-04
+                                    hub._grow = True
+
+                                    # 2016-08-05
+                                    self.pens.container[e_hub_pen_index]._bHub = True
+
+                                else:
+
+                                    cur_pen_index += self.hub_width + 1
+
+                                    self.last_hub_end_pen_index = cur_pen_index - 1
+
+                                self.container.append(hub)
+
+                                return 1
 
                     # -1 说明暂时没有找到合适的中枢,但同时搜索并没有到边界点
                     else:
