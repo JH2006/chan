@@ -220,7 +220,7 @@ def test_month_5(market, year, month, count=0, skips=0):
 
 if __name__ == '__main__':
 
-    test_month_10('', 2005, 2)
+    test_month_10('', 2006, 5)
     
     #t = []
     #for i in range(2005, 2016):
@@ -244,7 +244,7 @@ if __name__ == '__main__':
     #                                 'STOP',
     #                                 'GAIN'])
 
-    #file = '5笔中枢带修改+反向第三类买卖点建仓+中点平仓+中点止损+2阻力突破.xlsx'
+    #file = '4笔中枢不带修改+中点建仓+中点平仓.xlsx'
 
     #writer = pd.ExcelWriter(file, engine='xlsxwriter')
 

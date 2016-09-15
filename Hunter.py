@@ -451,6 +451,7 @@ class Ten_Min_Candle_Container(Candle_Container):
                 #    print('中枢修正:', len(self.container) - 1)
 
                 hubs.revert(pen_deleted)
+                #pass
 
             # K线生成事件注入
             can = monitor.genEvent(Event.Monitor.K_GEN)
@@ -486,9 +487,9 @@ class Ten_Min_Candle_Container(Candle_Container):
 
             # 2016-07-20
             # 修正中枢边界
-            hubs.mod_hub()
+            #hubs.mod_hub()
 
-            ## 中枢生成事件注入
+            # 中枢生成事件注入
             if single == 1:
 
                 born = monitor.genEvent(Event.Monitor.HUB_GEN)
@@ -1453,7 +1454,7 @@ class Hub_Container:
         self.container = []
 
         # 常量确定中枢的宽度
-        self.hub_width = 5
+        self.hub_width = 4
 
         self.last_hub_end_pen_index = 0
 
@@ -1637,6 +1638,10 @@ class Hub_Container:
                                   cur_pen_index + 1,
                                   cur_pen_index + self.hub_width)
 
+                        if cur_pen_index == 33:
+
+                            print('go')
+
                         # 2016-04-04
                         # 考虑到扩张开始的部分将来很有可能用于MACD以及此级别数据读取,因为在中枢可以确定存在扩张的时候记录起点指向原有中枢'End_Pen'
                         hub.x_pen = copy.deepcopy(hub.e_pen)
@@ -1667,9 +1672,9 @@ class Hub_Container:
 
                             # 2016-09-13
                             # 新增中枢边界包含判断
-                            elif self.overlap(hub, 'Up'):
+                            #elif self.overlap(hub, 'Up'):
 
-                                cur_pen_index += 1
+                            #    cur_pen_index += 1
 
                             # 新中枢具有合法的第一笔
                             # 记录新中枢相对于前一个中枢的位置属性
@@ -1722,9 +1727,9 @@ class Hub_Container:
 
                             # 2016-09-13
                             # 新增中枢边界包含判断
-                            elif self.overlap(hub, 'Down'):
+                            #elif self.overlap(hub, 'Down'):
 
-                                cur_pen_index += 1
+                            #    cur_pen_index += 1
 
                             else:
 
@@ -1778,7 +1783,7 @@ class Hub_Container:
                 return -1
 
     # 2016-08-05
-    # 中枢笔被删除时候做一定的中枢反转
+    # 中枢笔被删除时候做中枢反转
     # 中枢反转是指中枢最后一个笔的指针前移到一个合理的位置,重新计算中枢
     def revert(self, pen_deleted):
 
@@ -1805,15 +1810,23 @@ class Hub_Container:
 
             return False
 
+        # 笔挪动的个数和要求的中枢末尾笔希望的方向有关
+        # 如果要保持向上中枢以向下笔结束，
         else:
 
             if hub.pos == self.pens.container[pen_deleted - 1].pos:
 
-                self.last_hub_end_pen_index = pen_deleted - 2
+                # 中枢宽度为双数笔
+                self.last_hub_end_pen_index = pen_deleted - 1
+                # 中枢宽度为单数笔
+                #self.last_hub_end_pen_index = pen_deleted - 2
 
             else:
 
-                self.last_hub_end_pen_index = pen_deleted - 1
+                # 中枢宽度为双数笔
+                self.last_hub_end_pen_index = pen_deleted - 2
+                # 中枢宽度为单数笔
+                #self.last_hub_end_pen_index = pen_deleted - 1
 
             # 修改终结点
             hub.e_pen = self.pens.container[self.last_hub_end_pen_index]

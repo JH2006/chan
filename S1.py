@@ -285,9 +285,9 @@ class S2:
     # 根据具体的策略要求组合不同的Entry
     def loadEntry(self):
 
-        # self._entries[Component.MidEntry._name] = Component.MidEntry(0.3)
+         self._entries[Component.MidEntry._name] = Component.MidEntry(0.3)
 
-        self._entries[Component.ReverseEntry._name] = Component.ReverseEntry(0.5)
+        #self._entries[Component.ReverseEntry._name] = Component.ReverseEntry(0.5)
 
         # self._entries[Component.FollowEntry._name] = Component.FollowEntry(0.5)
 
@@ -307,7 +307,8 @@ class S2:
 
     def loadStop(self):
 
-        self._stops[Component.StopReverseExit._name] = Component.StopReverseExit(1)
+        #self._stops[Component.StopReverseExit._name] = Component.StopReverseExit(1)
+        pass
 
     # enter为事件触发响应接口
     # 对应事件：Monitor.K_GEN.
